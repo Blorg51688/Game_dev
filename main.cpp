@@ -51,11 +51,11 @@ int main()
         setlinestyle(PS_SOLID, 2);
         
         // Username field
-        setlinecolor(hoverUsername ? HOVER_COLOR : (inputActive && !activeField ? ACCENT : WHITE_TEXT));
+        setlinecolor(inputActive && !activeField ? ACCENT : (hoverUsername ? HOVER_COLOR : WHITE_TEXT));
         rectangle(x, y, x + boxWidth, y + boxHeight);
         
         // Password field
-        setlinecolor(hoverPassword ? HOVER_COLOR : (inputActive && activeField ? ACCENT : WHITE_TEXT));
+        setlinecolor(inputActive && activeField ? ACCENT : (hoverPassword ? HOVER_COLOR : WHITE_TEXT));
         rectangle(x, y + 80, x + boxWidth, y + 80 + boxHeight);
 
         // Draw labels
@@ -102,11 +102,30 @@ int main()
             settextcolor(SUCCESS_GREEN);
             TCHAR* msg = _T("Welcome!");
             outtextxy(screenWidth/2 - textwidth(msg)/2, msgY, msg);
+            FlushBatchDraw();
+            Sleep(1500);
+            int msgX= screenWidth/2 - textwidth(_T("Starting game..."))/2;
+            msg = _T("Starting game.");
+            outtextxy(msgX, msgY, msg);
+            FlushBatchDraw();
+            Sleep(500);
+            msg = _T("Starting game..");
+            outtextxy(msgX, msgY, msg);
+            FlushBatchDraw();
+            Sleep(500);
+            msg = _T("Starting game...");
+            outtextxy(msgX, msgY, msg);
+            FlushBatchDraw();
+            system("start testCode.exe");
+            Sleep(500);
+            EndBatchDraw();
+            closegraph();
+            return 0;
         }
 
         // Mouse handling
-        hoverUsername = hoverPassword = btnHover = false;
         if (MouseHit()) {
+            hoverUsername = hoverPassword = btnHover = false;
             m = GetMouseMsg();
             POINT pt = {m.x, m.y};
             
@@ -132,8 +151,6 @@ int main()
                 else if (btnHover) {
                     if (_tcscmp(user, _T("admin")) == 0 && _tcscmp(pass, _T("123456")) == 0) {
                         showSuccess = true;
-                        memset(user, 0, sizeof(user));
-                        memset(pass, 0, sizeof(pass));
                     } else {
                         showError = true;
                         memset(user, 0, sizeof(user));
@@ -179,7 +196,7 @@ int main()
         }
 
         FlushBatchDraw();
-        Sleep(20);
+        Sleep(2);
     }
 
     EndBatchDraw();
