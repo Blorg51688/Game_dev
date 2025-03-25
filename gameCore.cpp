@@ -4,21 +4,23 @@
 #include <bits/stdc++.h>
 using namespace std;
 
-// Function to store projectile positions
+// 弹丸数据结构
 struct Projectile {
     int x;
     int y;
-    int life; // Number of frames that the projectile will remain active
-    float angle; // Angle for projectile direction
-    clock_t fireTime; // Time when the projectile was fired
+    int life;
+    float angle;
+    clock_t fireTime;
 };
 
-// Store projectiles
 vector<Projectile> projectiles;
-// Track last firing time for each anti-aircraft battery
 clock_t lastFiringTimeBattery1 = 0;
 clock_t lastFiringTimeBattery2 = 0;
 
+int screenWidth = GetSystemMetrics(SM_CXSCREEN);
+int screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+// 防空炮塔绘制
 // Function to add new projectiles from anti-aircraft batteries
 void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
     int battery1X = screenWidth / 4;
@@ -37,7 +39,7 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
             p1.y = batteryY - 20; // Start position above battery
             p1.life = 2000; // Projectile lifetime
             p1.angle = angle1; // Store firing angle
-            p1.fireTime = clock() + i * (rand() % 100 + 50); // Staggered firing timing
+            p1.fireTime = clock() + i * 100; // Staggered firing timing
             projectiles.push_back(p1);
         }
 
@@ -56,7 +58,7 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
             p2.y = batteryY - 20; // Start position above battery
             p2.life = 2000; // Projectile lifetime
             p2.angle = angle2; // Store firing angle
-            p2.fireTime = clock() + i * (rand() % 100 + 50); // Staggered firing timing
+            p2.fireTime = clock() + i * 100; // Staggered firing timing
             projectiles.push_back(p2);
         }
 
@@ -144,62 +146,48 @@ void drawAABatteries(int screenWidth, int screenHeight) {
     rectangle(battery2X - 30, batteryY, battery2X + 30, batteryY - 20);
     rectangle(battery2X - 40, batteryY, battery2X + 40, batteryY - 10);
 }
-// 用户数据变量
-int score = 0; // 分数
-int difficultyModifier = 0; // 难度修正
-int skillPoints = 0; // 技能点
 
-// 防空塔和炮弹升级变量
-int AATowerUpgrade1 = 0; // 防空塔升级1
-int AABatteriesUpgrade1 = 0; // 防空阵地升级1
-int AABatteriesUpgrade2 = 0; // 防空阵地升级2
-int shellUpgrade1 = 0; // 炮弹升级1
-int shellUpgrade2 = 0; // 炮弹升级2
+// 全局游戏数据
+int score = 0;
+int difficultyModifier = 0;
+int skillPoints = 0;
+int AATowerUpgrade1 = 0;
+int AABatteriesUpgrade1 = 0;
+int AABatteriesUpgrade2 = 0;
+int shellUpgrade1 = 0;
+int shellUpgrade2 = 0;
 
-int main() {
-    // 安全缓冲区保留
-    char username_buf[21] = {0};
-    char password_buf[21] = {0};
+void saveGameData(const char* username, const char* password) {
+    cleardevice();
+    settextcolor(WHITE);
+    settextstyle(36, 0, _T("Arial"));
+    const TCHAR* msg = _T("Saving Data.");
+    int msgX = (screenWidth - textwidth(msg)) / 2;
+    int msgY = screenHeight / 2;
     
-    // 使用全局变量进行数据存储
-    ifstream activeFile("activeUser.txt");
-    if (activeFile) {
-        string line;
-        if (getline(activeFile, line)) {
-            // 直接赋值给全局变量
-            int result = sscanf(line.c_str(), 
-                "{[%20[^,],%20[^]]],[%d,%d,%d],[%d,%d,%d,%d,%d]}",
-                username_buf, password_buf,
-                &score,  // 使用全局变量
-                &difficultyModifier, 
-                &skillPoints,
-                &AATowerUpgrade1,  // 直接映射到原有全局变量
-                &AABatteriesUpgrade1,
-                &AABatteriesUpgrade2,
-                &shellUpgrade1,
-                &shellUpgrade2);
-            
-            // 验证逻辑保持不变...
-        }
-        activeFile.close();
-    }
+    outtextxy(msgX, msgY, msg);
+    FlushBatchDraw();
+    Sleep(500);
+    
+    msg = _T("Saving Data..");
+    outtextxy(msgX, msgY, msg);
+    FlushBatchDraw();
+    Sleep(500);
+    
+    msg = _T("Saving Data...");
+    outtextxy(msgX, msgY, msg);
+    FlushBatchDraw();
+    Sleep(500);
 
-    // 转换为标准字符串（已自动截断）
-    string username(username_buf);
-    string password(password_buf);
-
-    // 更新游戏数据（示例）
-    score += 13;
-
-    // 构建安全输出格式
+    // 构建保存数据
     ostringstream oss;
-    oss << "{[" << username_buf << "," << password_buf << "],["
+    oss << "{[" << username << "," << password << "],["
         << score << "," << difficultyModifier << "," << skillPoints << "],["
         << AATowerUpgrade1 << "," << AABatteriesUpgrade1 << "," 
         << AABatteriesUpgrade2 << "," << shellUpgrade1 << "," 
         << shellUpgrade2 << "]}";
 
-    // 安全写入activeUser
+    // 写入activeUser
     ofstream outActive("activeUser.txt");
     if (outActive) {
         outActive << oss.str() << '\n';
@@ -231,5 +219,66 @@ int main() {
         }
         outSaves.close();
     }
+}
+
+int main() {
+    // 初始化图形窗口
+    initgraph(screenWidth, screenHeight, SHOWCONSOLE);
+    BeginBatchDraw();
+
+    // 加载用户数据
+    char username_buf[21] = {0};
+    char password_buf[21] = {0};
+    
+    ifstream activeFile("activeUser.txt");
+    if (activeFile) {
+        string line;
+        if (getline(activeFile, line)) {
+            sscanf(line.c_str(), 
+                "{[%20[^,],%20[^]]],[%d,%d,%d],[%d,%d,%d,%d,%d]}",
+                username_buf, password_buf,
+                &score, &difficultyModifier, &skillPoints,
+                &AATowerUpgrade1, &AABatteriesUpgrade1,
+                &AABatteriesUpgrade2, &shellUpgrade1, &shellUpgrade2);
+        }
+        activeFile.close();
+    }
+
+    // 游戏主循环
+    int angle = 0;
+    bool running = true;
+    
+    while (running) {
+        // 处理输入
+        if (_kbhit()) {
+            int key = _getch();
+            if (key == 27) { // ESC键
+                running = false;
+            }
+        }
+
+        // 更新游戏状态
+        cleardevice();
+        angle = (angle + 1) % 360;
+        
+        // 绘制游戏元素
+        drawAATower(screenWidth, screenHeight, angle);
+        drawAABatteries(screenWidth, screenHeight);
+        addAABatteriesProjectiles(screenWidth, screenHeight);
+        simulateFiring();
+
+        // 示例游戏逻辑
+        score += 1;
+        
+        FlushBatchDraw();
+        Sleep(10);
+    }
+
+    // 保存游戏数据
+    saveGameData(username_buf, password_buf);
+
+    // 清理资源
+    EndBatchDraw();
+    closegraph();
     return 0;
 }

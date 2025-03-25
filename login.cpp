@@ -96,7 +96,7 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
             p1.y = batteryY - 20; // Start position above battery
             p1.life = 2000; // Projectile lifetime
             p1.angle = angle1; // Store firing angle
-            p1.fireTime = clock() + i * (rand() % 100 + 50); // Staggered firing timing
+            p1.fireTime = clock() + i * 100; // Staggered firing timing
             projectiles.push_back(p1);
         }
 
@@ -115,7 +115,7 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
             p2.y = batteryY - 20; // Start position above battery
             p2.life = 2000; // Projectile lifetime
             p2.angle = angle2; // Store firing angle
-            p2.fireTime = clock() + i * (rand() % 100 + 50); // Staggered firing timing
+            p2.fireTime = clock() + i * 100; // Staggered firing timing
             projectiles.push_back(p2);
         }
 
