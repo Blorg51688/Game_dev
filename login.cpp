@@ -74,52 +74,52 @@ struct Projectile {
 
 // Store projectiles
 vector<Projectile> projectiles;
-// 分别维护两个阵地的最后开火时间
+// Track last firing time for each anti-aircraft battery
 clock_t lastFiringTimeBattery1 = 0;
 clock_t lastFiringTimeBattery2 = 0;
 
 // Function to add new projectiles from anti-aircraft batteries
-void addNewProjectiles(int screenWidth, int screenHeight) {
+void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
     int battery1X = screenWidth / 4;
     int battery2X = screenWidth * 3 / 4;
     int batteryY = screenHeight - 30;
 
-    // 检查第一个阵地是否到了开火时间
-    if (clock() - lastFiringTimeBattery1 > rand() % 3000 + 1000) { // 随机开火间隔
-        // 随机设置第一个阵地的开火角度
-        float angle1 = 45.0f + static_cast<float>(rand() % 90); // 角度在30到60度之间
+    // Check if battery 1 is ready to fire
+    if (clock() - lastFiringTimeBattery1 > rand() % 3000 + 1000) { // Random cooldown
+        // Calculate firing angle for battery 1
+        float angle1 = 45.0f + static_cast<float>(rand() % 90); // Angle between 30 and 60 degrees
 
-        // 为第一个阵地添加三连发炮弹
+        // Create projectiles for battery 1
         for (int i = 0; i < (rand()%8)+2 ; ++i) {
             Projectile p1;
             p1.x = battery1X + (rand() % 20 - 10);
-            p1.y = batteryY - 20; // 从阵地正上方开始
-            p1.life = 2000; // 炮弹的生命周期
-            p1.angle = angle1; // 存储炮弹的发射角度
-            p1.fireTime = clock() + i * (rand() % 100 + 50); // 添加延迟以实现三连发
+            p1.y = batteryY - 20; // Start position above battery
+            p1.life = 2000; // Projectile lifetime
+            p1.angle = angle1; // Store firing angle
+            p1.fireTime = clock() + i * (rand() % 100 + 50); // Staggered firing timing
             projectiles.push_back(p1);
         }
 
-        lastFiringTimeBattery1 = clock(); // 更新第一个阵地的最后开火时间
+        lastFiringTimeBattery1 = clock(); // Update last firing time
     }
 
-    // 检查第二个阵地是否到了开火时间
-    if (clock() - lastFiringTimeBattery2 > rand() % 3000 + 1000) { // 随机开火间隔
-        // 随机设置第二个阵地的开火角度
-        float angle2 = 45.0f + static_cast<float>(rand() % 90); // 角度在30到60度之间
+    // Check if battery 2 is ready to fire
+    if (clock() - lastFiringTimeBattery2 > rand() % 3000 + 1000) { // Random cooldown
+        // Calculate firing angle for battery 2
+        float angle2 = 45.0f + static_cast<float>(rand() % 90); // Angle between 30 and 60 degrees
 
-        // 为第二个阵地添加三连发炮弹
+        // Create projectiles for battery 2
         for (int i = 0; i < (rand()%8)+2 ; ++i) {
             Projectile p2;
             p2.x = battery2X + (rand() % 20 - 10);
-            p2.y = batteryY - 20; // 从阵地正上方开始
-            p2.life = 2000; // 炮弹的生命周期
-            p2.angle = angle2; // 存储炮弹的发射角度
-            p2.fireTime = clock() + i * (rand() % 100 + 50); // 添加延迟以实现三连发
+            p2.y = batteryY - 20; // Start position above battery
+            p2.life = 2000; // Projectile lifetime
+            p2.angle = angle2; // Store firing angle
+            p2.fireTime = clock() + i * (rand() % 100 + 50); // Staggered firing timing
             projectiles.push_back(p2);
         }
 
-        lastFiringTimeBattery2 = clock(); // 更新第二个阵地的最后开火时间
+        lastFiringTimeBattery2 = clock(); // Update last firing time
     }
 }
 
@@ -127,14 +127,14 @@ void addNewProjectiles(int screenWidth, int screenHeight) {
 
 // Function to simulate firing from anti-aircraft batteries
 void simulateFiring() {
-    // 更新和绘制炮弹
+    // Update and render projectiles
     setfillcolor(RGB(255, 0, 0)); // Bright red projectile
     double pSpeed = 10.0; // Projectile speed
     clock_t currentTime = clock(); // Get the current time once
 
     for (auto it = projectiles.begin(); it != projectiles.end();) {
         if (currentTime >= it->fireTime && it->life > 0) {  // Check if it's time to fire the projectile
-            solidcircle(it->x, it->y, 3); // 绘制炮弹
+            solidcircle(it->x, it->y, 3); // Draw projectile
             it->y -= pSpeed * sin(it->angle * 3.14159265 / 180); // Move the projectile based on its angle
             it->x += pSpeed * cos(it->angle * 3.14159265 / 180); // Move to the direction of the angle
             it->life--; // Decrease life
@@ -150,7 +150,7 @@ void simulateFiring() {
 
 
 // Function to draw the anti-aircraft tower
-void drawAntiAircraftTower(int screenWidth, int screenHeight, int angle) {
+void drawAATower(int screenWidth, int screenHeight, int angle) {
     int baseX = screenWidth / 2;
     int baseY = screenHeight - 30;
     int towerHeight = 80; // Reduced tower height
@@ -184,7 +184,7 @@ void drawAntiAircraftTower(int screenWidth, int screenHeight, int angle) {
 }
 
 // Function to draw anti-aircraft batteries
-void drawAntiAircraftBatteries(int screenWidth, int screenHeight) {
+void drawAABatteries(int screenWidth, int screenHeight) {
     int battery1X = screenWidth / 4;
     int battery2X = screenWidth * 3 / 4;
     int batteryY = screenHeight - 30;
@@ -305,6 +305,24 @@ int main() {
             const TCHAR* msg = _T("Welcome!");
             outtextxy(screenWidth / 2 - textwidth(msg) / 2, msgY, msg);
             FlushBatchDraw();
+            // Read user data from saves.txt and write to activeUser.txt
+            FILE* savesFile = _tfopen(_T("saves.txt"), _T("r"));
+            if (savesFile) {
+                TCHAR line[256];
+                while (_fgetts(line, sizeof(line) / sizeof(TCHAR), savesFile)) {
+                    TCHAR username[16], password[16];
+                    _stscanf(line, _T("{[%[^,],%[^]]]}"), username, password);
+                    if (_tcscmp(user, username) == 0) {
+                        FILE* activeUserFile = _tfopen(_T("activeUser.txt"), _T("w"));
+                        if (activeUserFile) {
+                            _ftprintf(activeUserFile, _T("%s"), line);
+                            fclose(activeUserFile);
+                        }
+                        break;
+                    }
+                }
+                fclose(savesFile);
+            }
             Sleep(1500);
             int msgX = screenWidth / 2 - textwidth(_T("Starting game...")) / 2;
             msg = _T("Starting game.");
@@ -318,7 +336,7 @@ int main() {
             msg = _T("Starting game...");
             outtextxy(msgX, msgY, msg);
             FlushBatchDraw();
-            system("start testCode.exe");
+            system("start gameCore.exe");
             Sleep(500);
             EndBatchDraw();
             closegraph();
@@ -351,15 +369,15 @@ int main() {
                     if (checkUserAndPass(user, pass)) {
                         showSuccess = true;
                     } else {
-                        // 检查用户是否存在
+                        // Check if user exists
                         if (checkUserExist(user)) {
-                            showError = true; // 用户存在但密码不匹配
+                            showError = true; // User exists but password doesn't match
                         } else {
-                            // 用户不存在，尝试注册
+                            // User doesn't exist, try to register
                             if (_tcslen(pass) > 0 && registerUser(user, pass)) {
                                 showSuccess = true;
                             } else {
-                                showError = true; // 密码为空或注册失败
+                                showError = true; // Empty password or registration failed
                             }
                         }
                         memset(user, 0, sizeof(user));
@@ -404,13 +422,13 @@ int main() {
         }
 
         // Draw anti-aircraft tower and searchlights
-        drawAntiAircraftTower(screenWidth, screenHeight, angle);
+        drawAATower(screenWidth, screenHeight, angle);
 
         // Draw anti-aircraft batteries
-        drawAntiAircraftBatteries(screenWidth, screenHeight);
+        drawAABatteries(screenWidth, screenHeight);
 
         // Add new projectiles
-        addNewProjectiles(screenWidth, screenHeight);
+        addAABatteriesProjectiles(screenWidth, screenHeight);
 
         // Simulate firing
         simulateFiring();
