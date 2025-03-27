@@ -20,6 +20,150 @@ clock_t lastFiringTimeBattery2 = 0;
 int screenWidth = GetSystemMetrics(SM_CXSCREEN);
 int screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
+
+// 全局游戏数据
+int score = 0;
+int difficultyModifier = 0;
+int skillPoints = 0;
+int AATowerUpgrade1 = 0;
+int AABatteriesUpgrade1 = 0;
+int AABatteriesUpgrade2 = 0;
+int shellUpgrade1 = 0;
+int shellUpgrade2 = 0;
+
+// 在全局游戏数据部分添加以下内容
+enum AircraftType { LIGHT, MEDIUM, HEAVY, SUPER_HEAVY };
+
+struct Aircraft {
+    AircraftType type;
+    float x, y;
+    float speed;
+    int direction; // 1:从左向右飞 -1:从右向左飞
+    int altitude;  // 0:低空 1:中空 2:高空
+};
+
+vector<Aircraft> aircrafts;
+clock_t lastAircraftGenTime = 0;
+
+// 在游戏循环前添加飞机生成函数
+void generateAircrafts() {
+    if (clock() - lastAircraftGenTime > rand() % 3000 + 2) { // 2-5秒生成间隔
+        Aircraft newPlane;
+        newPlane.type = static_cast<AircraftType>(rand() % 4);
+        newPlane.direction = (rand() % 2) ? 1 : -1;
+        
+        // 设置生成区域参数
+        int genAreaTop = 0;
+        int genAreaHeight = screenHeight * 2 / 3;
+        int altitudeZone = 0;
+
+        // 根据机型确定生成空域
+        switch(newPlane.type) {
+            case LIGHT:
+                altitudeZone = rand() % 2; // 0-1
+                break;
+            case MEDIUM:
+                altitudeZone = rand() % 3; // 0-2
+                break; 
+            case HEAVY:
+                altitudeZone = 1 + rand() % 2; // 1-2
+                break;
+            case SUPER_HEAVY:
+                altitudeZone = 2; // 固定高空
+                break;
+        }
+        
+        // 计算具体生成高度
+        int zoneHeight = genAreaHeight / 3;
+// 将高度区域反向计算 (2 - altitudeZone)
+        newPlane.y = genAreaTop + ((2 - altitudeZone) * zoneHeight) + rand() % (zoneHeight - 40);
+
+        
+        // 设置速度和初始位置
+        switch(newPlane.type) {
+            case LIGHT:
+                newPlane.speed = 6.0f + (rand() % 200 - 100)/100.0f;
+                break;
+            case MEDIUM:
+                newPlane.speed = 4.0f + (rand() % 200 - 100)/100.0f;
+                break;
+            case HEAVY:
+                newPlane.speed = 2.0f + (rand() % 200 - 100)/100.0f;
+                break;
+            case SUPER_HEAVY:
+                newPlane.speed = 1.0f + (rand() % 200 - 100)/100.0f;
+                break;
+        }
+        
+        newPlane.x = (newPlane.direction == 1) ? -100 : screenWidth + 100;
+        aircrafts.push_back(newPlane);
+        lastAircraftGenTime = clock();
+    }
+}
+
+// 添加飞机更新函数
+void updateAircrafts() {
+    for (auto it = aircrafts.begin(); it != aircrafts.end();) {
+        it->x += it->speed * it->direction;
+        
+        // 移出屏幕的飞机移除
+        if ((it->direction == 1 && it->x > screenWidth + 100) ||
+            (it->direction == -1 && it->x < -100)) {
+            it = aircrafts.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+// 改进后的飞机绘制函数
+void drawAircrafts() {
+    for (const auto& plane : aircrafts) {
+        COLORREF mainColor = RGB(150, 150, 150);
+        double d=0;
+        // 根据机型定制特征
+        switch(plane.type) {
+            case LIGHT:
+                d=plane.direction;
+                mainColor = RGB(173, 216, 230);
+                //body
+                setfillcolor(mainColor*0.9);
+                fillrectangle(plane.x - d * 20, plane.y - 10, plane.x + d * 20, plane.y + 10);
+                fillrectangle(plane.x - d * 50, plane.y - 0, plane.x - d * 20, plane.y + 10);
+                fillrectangle(plane.x - d * 60, plane.y - 10, plane.x - d * 50, plane.y + 10);
+                //wing
+                setfillcolor(mainColor*0.8);
+                fillrectangle(plane.x - d * 18, plane.y + 8, plane.x + d * 18, plane.y + 12);
+                fillrectangle(plane.x - d * 60, plane.y + 4, plane.x - d * 50, plane.y + 8);
+                //propeller
+                fillrectangle(plane.x + d * 20, plane.y - 3, plane.x + d * 25, plane.y + 3);
+                if(clock()%3==0){
+                    fillrectangle(plane.x + d * 25, plane.y - 15, plane.x + d * 30, plane.y + 15);
+                }else if(clock()%3==1){
+                    fillrectangle(plane.x + d * 25, plane.y - 7, plane.x + d * 30, plane.y + 7);
+                }else{
+                    fillrectangle(plane.x + d * 25, plane.y - 3, plane.x + d * 30, plane.y + 3);
+                }
+                //cockpit
+                setfillcolor(mainColor*0.7);
+                fillrectangle(plane.x - d * 0, plane.y - 13, plane.x + d * 15, plane.y - 7);
+                break;
+            case MEDIUM:
+                d=plane.direction;
+                mainColor = RGB(100, 149, 237);
+                //body
+                setfillcolor(mainColor*1);
+                fillrectangle(plane.x - d * 20, plane.y - 10, plane.x + d * 20, plane.y + 10);
+                break;
+            case HEAVY:
+                break;
+            case SUPER_HEAVY:
+                break;
+        }
+    }
+}
+
+
 // 防空炮塔绘制
 // Function to add new projectiles from anti-aircraft batteries
 void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
@@ -146,16 +290,27 @@ void drawAABatteries(int screenWidth, int screenHeight) {
     rectangle(battery2X - 30, batteryY, battery2X + 30, batteryY - 20);
     rectangle(battery2X - 40, batteryY, battery2X + 40, batteryY - 10);
 }
+// 在屏幕左上角绘制游戏数据
+void drawGameStats() {
+    // 设置文本属性
+    settextcolor(RGB(255, 255, 255));  // 白色文本
+    settextstyle(20, 0, _T("Consolas"));
+    setbkmode(TRANSPARENT);
 
-// 全局游戏数据
-int score = 0;
-int difficultyModifier = 0;
-int skillPoints = 0;
-int AATowerUpgrade1 = 0;
-int AABatteriesUpgrade1 = 0;
-int AABatteriesUpgrade2 = 0;
-int shellUpgrade1 = 0;
-int shellUpgrade2 = 0;
+    // 创建三行文本缓冲区
+    TCHAR line1[32], line2[32], line3[32];
+    
+    // 分别格式化三行文本
+    _stprintf(line1, _T("Score: %10d"), score);
+    _stprintf(line2, _T("Difficulty: %5d"), difficultyModifier);
+    _stprintf(line3, _T("Skill Points: %3d"), skillPoints);
+
+    // 逐行绘制（行间距25像素）
+    outtextxy(10, 10, line1);    // 第一行
+    outtextxy(10, 35, line2);    // 第二行（10+25）
+    outtextxy(10, 60, line3);    // 第三行（35+25）
+}
+
 
 void saveGameData(const char* username, const char* password) {
     cleardevice();
@@ -252,23 +407,59 @@ int main() {
         // 处理输入
         if (_kbhit()) {
             int key = _getch();
-            if (key == 27) { // ESC键
-                running = false;
+            switch (key) {
+                case 27: // ESC键
+                    running = false;
+                    break;
+                case 'q':
+                    if(skillPoints > 0) {
+                        AATowerUpgrade1++;
+                        skillPoints--;
+                    }
+                    break;
+                case 'w':
+                    if(skillPoints > 0) {
+                        AABatteriesUpgrade1++;
+                        skillPoints--;
+                    }
+                    break;
+                case 'e':
+                    if(skillPoints > 0) {
+                        AABatteriesUpgrade2++;
+                        skillPoints--;
+                    }
+                    break;
+                case 'r':
+                    if(skillPoints > 0) {
+                        shellUpgrade1++;
+                        skillPoints--;
+                    }
+                    break;
+                case 't':
+                    if(skillPoints > 0) {
+                        shellUpgrade2++;
+                        skillPoints--;
+                    }
+                    break;
             }
         }
 
         // 更新游戏状态
         cleardevice();
         angle = (angle + 1) % 360;
+
+        // 新增飞机系统调用
+        generateAircrafts();
+        updateAircrafts();
         
         // 绘制游戏元素
+        drawAircrafts();
         drawAATower(screenWidth, screenHeight, angle);
         drawAABatteries(screenWidth, screenHeight);
         addAABatteriesProjectiles(screenWidth, screenHeight);
         simulateFiring();
 
-        // 示例游戏逻辑
-        score += 1;
+        drawGameStats();
         
         FlushBatchDraw();
         Sleep(10);
