@@ -47,7 +47,7 @@ clock_t lastAircraftGenTime = 0;
 
 // 在游戏循环前添加飞机生成函数
 void generateAircrafts() {
-    if (clock() - lastAircraftGenTime > rand() % 3000 + 2) { // 2-5秒生成间隔
+    if (clock() - lastAircraftGenTime > rand() % 3000 + 2000) { // 2-5秒生成间隔
         Aircraft newPlane;
         newPlane.type = static_cast<AircraftType>(rand() % 4);
         newPlane.direction = (rand() % 2) ? 1 : -1;
@@ -119,45 +119,125 @@ void updateAircrafts() {
 // 改进后的飞机绘制函数
 void drawAircrafts() {
     for (const auto& plane : aircrafts) {
-        COLORREF mainColor = RGB(150, 150, 150);
-        double d=0;
+        COLORREF mainColor,subColor,cockpitColor=RGB(255, 165, 0);
+        double d=plane.direction;
         // 根据机型定制特征
         switch(plane.type) {
             case LIGHT:
-                d=plane.direction;
                 mainColor = RGB(173, 216, 230);
+                subColor = RGB(32,93,93);
                 //body
                 setfillcolor(mainColor*0.9);
                 fillrectangle(plane.x - d * 20, plane.y - 10, plane.x + d * 20, plane.y + 10);
                 fillrectangle(plane.x - d * 50, plane.y - 0, plane.x - d * 20, plane.y + 10);
                 fillrectangle(plane.x - d * 60, plane.y - 10, plane.x - d * 50, plane.y + 10);
                 //wing
-                setfillcolor(mainColor*0.8);
+                setfillcolor(subColor);
                 fillrectangle(plane.x - d * 18, plane.y + 8, plane.x + d * 18, plane.y + 12);
                 fillrectangle(plane.x - d * 60, plane.y + 4, plane.x - d * 50, plane.y + 8);
                 //propeller
                 fillrectangle(plane.x + d * 20, plane.y - 3, plane.x + d * 25, plane.y + 3);
-                if(clock()%3==0){
+                if(rand()%3==0){
                     fillrectangle(plane.x + d * 25, plane.y - 15, plane.x + d * 30, plane.y + 15);
-                }else if(clock()%3==1){
-                    fillrectangle(plane.x + d * 25, plane.y - 7, plane.x + d * 30, plane.y + 7);
+                }else if(rand()%3==1){
+                    fillrectangle(plane.x + d * 25, plane.y - 10, plane.x + d * 30, plane.y + 10);
                 }else{
                     fillrectangle(plane.x + d * 25, plane.y - 3, plane.x + d * 30, plane.y + 3);
                 }
                 //cockpit
-                setfillcolor(mainColor*0.7);
+                setfillcolor(cockpitColor);
                 fillrectangle(plane.x - d * 0, plane.y - 13, plane.x + d * 15, plane.y - 7);
                 break;
             case MEDIUM:
-                d=plane.direction;
-                mainColor = RGB(100, 149, 237);
+                mainColor = RGB(100,160,200);
+                subColor = RGB(0,153,136);
                 //body
-                setfillcolor(mainColor*1);
-                fillrectangle(plane.x - d * 20, plane.y - 10, plane.x + d * 20, plane.y + 10);
+                setfillcolor(mainColor);
+                fillrectangle(plane.x - d * 20, plane.y - 15, plane.x + d * 20, plane.y + 15);
+                fillrectangle(plane.x - d * 30, plane.y - 10, plane.x - d * 20, plane.y + 10);
+                fillrectangle(plane.x - d * 60, plane.y - 0, plane.x - d * 30, plane.y + 10);
+                fillrectangle(plane.x - d * 70, plane.y - 15, plane.x - d * 60, plane.y + 10);
+                fillrectangle(plane.x + d * 20, plane.y - 5, plane.x + d * 30, plane.y + 15);
+                //wing
+                setfillcolor(subColor);
+                fillrectangle(plane.x - d * 18, plane.y + 12, plane.x + d * 18, plane.y + 18);
+                fillrectangle(plane.x - d * 70, plane.y + 4, plane.x - d * 50, plane.y + 8);
+                //propeller
+                fillrectangle(plane.x + d * 30, plane.y + 2, plane.x + d * 35, plane.y + 8);
+                if(rand()%3==0){
+                    fillrectangle(plane.x + d * 35, plane.y - 15, plane.x + d * 40, plane.y + 25);
+                }else if(rand()%3==1){
+                    fillrectangle(plane.x + d * 35, plane.y - 5, plane.x + d * 40, plane.y + 15);
+                }else{
+                    fillrectangle(plane.x + d * 35, plane.y + 2, plane.x + d * 40, plane.y + 8);
+                }
+                //cockpit
+                setfillcolor(cockpitColor);
+                fillrectangle(plane.x + d * 1, plane.y - 18, plane.x + d * 15, plane.y - 12);
+                fillrectangle(plane.x - d * 15, plane.y - 18, plane.x - d * 1, plane.y - 12);
                 break;
             case HEAVY:
+                mainColor = RGB(0,102,178);
+                subColor = RGB(32,93,93);
+                //body
+                setfillcolor(mainColor);
+                fillrectangle(plane.x - d * 40, plane.y - 15, plane.x + d * 30, plane.y + 15);
+                fillrectangle(plane.x - d * 80, plane.y - 15, plane.x - d * 40, plane.y + 0);
+                fillrectangle(plane.x - d * 100, plane.y - 20, plane.x - d * 80, plane.y + 5);
+
+                //wing
+                setfillcolor(subColor);
+                fillrectangle(plane.x - d * 30, plane.y - 3, plane.x + d * 10, plane.y + 3);
+                fillrectangle(plane.x - d * 10, plane.y + 3, plane.x + d * 10, plane.y + 13);
+                //propeller
+                fillrectangle(plane.x + d * 10, plane.y + 5, plane.x + d * 15, plane.y + 11);
+                if(rand()%3==0){
+                    fillrectangle(plane.x + d * 15, plane.y - 7, plane.x + d * 20, plane.y + 23);
+                }else if(rand()%3==1){
+                    fillrectangle(plane.x + d * 15, plane.y - 0, plane.x + d * 20, plane.y + 16);
+                }else{
+                    fillrectangle(plane.x + d * 15, plane.y + 5, plane.x + d * 20, plane.y + 11);
+                }
+                //cockpit
+                setfillcolor(cockpitColor);
+                fillrectangle(plane.x - d * 5, plane.y - 18, plane.x + d * 20, plane.y - 12);
                 break;
             case SUPER_HEAVY:
+                mainColor = RGB(25,25,112);
+                subColor = RGB(0,153,136);
+                //body
+                setfillcolor(mainColor);
+                fillrectangle(plane.x - d * 50, plane.y - 20, plane.x + d * 50, plane.y + 20);
+                fillrectangle(plane.x - d * 90, plane.y - 20, plane.x - d * 50, plane.y + 10);
+                fillrectangle(plane.x - d * 130, plane.y - 20, plane.x - d * 90, plane.y + 0);
+                fillrectangle(plane.x - d * 150, plane.y - 30, plane.x - d * 130, plane.y + 10);
+
+                //wing
+                setfillcolor(subColor);
+                fillrectangle(plane.x - d * 30, plane.y - 3, plane.x + d * 30, plane.y + 3);
+                fillrectangle(plane.x + d * 10, plane.y + 3, plane.x + d * 30, plane.y + 13);
+                fillrectangle(plane.x - d * 5, plane.y + 3, plane.x + d * 15, plane.y + 13);
+                //propeller
+                fillrectangle(plane.x + d * 30, plane.y + 5, plane.x + d * 35, plane.y + 11);
+                fillrectangle(plane.x + d * 15, plane.y + 5, plane.x + d * 20, plane.y + 11);
+                if(rand()%3==0){
+                    fillrectangle(plane.x + d * 35, plane.y - 7, plane.x + d * 40, plane.y + 23);
+                }else if(rand()%3==1){
+                    fillrectangle(plane.x + d * 35, plane.y - 0, plane.x + d * 40, plane.y + 16);
+                }else{
+                    fillrectangle(plane.x + d * 35, plane.y + 5, plane.x + d * 40, plane.y + 11);
+                }
+                if(rand()%3==0){
+                    fillrectangle(plane.x + d * 20, plane.y - 7, plane.x + d * 25, plane.y + 23);
+                }else if(rand()%3==1){
+                    fillrectangle(plane.x + d * 20, plane.y - 0, plane.x + d * 25, plane.y + 16);
+                }else{
+                    fillrectangle(plane.x + d * 20, plane.y + 5, plane.x + d * 25, plane.y + 11);
+                }
+                //cockpit
+                setfillcolor(cockpitColor);
+                fillrectangle(plane.x + d * 16, plane.y - 23, plane.x + d * 40, plane.y - 17);
+                fillrectangle(plane.x - d * 10, plane.y - 23, plane.x + d * 14, plane.y - 17);
                 break;
         }
     }
