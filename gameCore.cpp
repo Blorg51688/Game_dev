@@ -143,11 +143,18 @@ void handleCollision(Aircraft& plane) {
                 break;
         }
         
-        // 检查是否跨过1000分的倍数
+        // 检查是否跨过1000分的倍数（技能点）
         int oldThousands = oldScore / 1000;
         int newThousands = score / 1000;
         if (newThousands > oldThousands) {
             skillPoints++;
+        }
+        
+        // 检查是否跨过100分的倍数（难度修正）
+        int oldHundreds = oldScore / 100;
+        int newHundreds = score / 100;
+        if (newHundreds > oldHundreds) {
+            difficultyModifier++;
         }
         
         plane.isDying = true;

@@ -204,241 +204,294 @@ void drawAABatteries(int screenWidth, int screenHeight) {
     rectangle(battery2X - 40, batteryY, battery2X + 40, batteryY - 10);
 }
 
+// Global variables for UI state
+struct UIState {
+    TCHAR user[16];
+    TCHAR pass[16];
+    bool activeField;      // false: username, true: password
+    bool inputActive;
+    clock_t cursorTimer;
+    bool showCursor;
+    bool showError;
+    bool showSuccess;
+    bool btnHover;
+    bool hoverUsername;
+    bool hoverPassword;
+    int angle;             // Angle for the searchlights
+};
+
+// Global variables for UI parameters
+struct UIParams {
+    int screenWidth;
+    int screenHeight;
+    int boxWidth;
+    int boxHeight;
+    int btnWidth;
+    int btnHeight;
+    int x;
+    int y;
+    COLORREF DARK_BG;
+    COLORREF ACCENT;
+    COLORREF ERROR_RED;
+    COLORREF SUCCESS_GREEN;
+    COLORREF WHITE_TEXT;
+    COLORREF HOVER_COLOR;
+};
+
+// Function to initialize graphics and UI parameters
+UIParams initializeUI() {
+    UIParams params;
+    params.screenWidth = GetSystemMetrics(SM_CXSCREEN);
+    params.screenHeight = GetSystemMetrics(SM_CYSCREEN);
+    params.boxWidth = 400;
+    params.boxHeight = 50;
+    params.btnWidth = 200;
+    params.btnHeight = 50;
+    params.x = (params.screenWidth - params.boxWidth) / 2;
+    params.y = params.screenHeight / 3;
+    
+    params.DARK_BG = RGB(30, 30, 36);
+    params.ACCENT = RGB(0, 145, 255);
+    params.ERROR_RED = RGB(255, 80, 80);
+    params.SUCCESS_GREEN = RGB(80, 255, 80);
+    params.WHITE_TEXT = RGB(240, 240, 240);
+    params.HOVER_COLOR = RGB(100, 100, 110);
+    
+    return params;
+}
+
+// Function to initialize UI state
+UIState initializeUIState() {
+    UIState state = {0};
+    state.activeField = false;
+    state.inputActive = false;
+    state.cursorTimer = clock();
+    state.showCursor = false;
+    state.showError = false;
+    state.showSuccess = false;
+    state.btnHover = false;
+    state.hoverUsername = false;
+    state.hoverPassword = false;
+    state.angle = 0;
+    return state;
+}
+
+// Function to handle keyboard input
+void handleKeyboardInput(UIState& state) {
+    if (state.inputActive && _kbhit()) {
+        TCHAR ch = _getch();
+        TCHAR* target = state.activeField ? state.pass : state.user;
+        size_t len = _tcslen(target);
+
+        switch (ch) {
+            case '\b':
+                if (len > 0) target[len - 1] = '\0';
+                break;
+            case '\t':
+                state.activeField = !state.activeField;
+                break;
+            case '\r':
+                state.inputActive = false;
+                break;
+            default:
+                if (len < 15 && ch >= 32 && ch <= 126) {
+                    target[len] = ch;
+                    target[len + 1] = '\0';
+                }
+        }
+        state.showCursor = true;
+        state.cursorTimer = clock();
+    }
+}
+
+// Function to handle mouse input
+void handleMouseInput(UIState& state, const UIParams& params) {
+    if (MouseHit()) {
+        state.hoverUsername = state.hoverPassword = state.btnHover = false;
+        MOUSEMSG m = GetMouseMsg();
+        POINT pt = {m.x, m.y};
+
+        // Hover detection
+        state.hoverUsername = (pt.x > params.x && pt.x < params.x + params.boxWidth && 
+                             pt.y > params.y && pt.y < params.y + params.boxHeight);
+        state.hoverPassword = (pt.x > params.x && pt.x < params.x + params.boxWidth && 
+                             pt.y > params.y + 80 && pt.y < params.y + 80 + params.boxHeight);
+        int btnX = params.x + (params.boxWidth - params.btnWidth) / 2;
+        int btnY = params.y + 180;
+        state.btnHover = (pt.x > btnX && pt.x < btnX + params.btnWidth && 
+                        pt.y > btnY && pt.y < btnY + params.btnHeight);
+
+        if (m.uMsg == WM_LBUTTONDOWN) {
+            state.showError = false;
+            state.showSuccess = false;
+
+            if (state.hoverUsername) {
+                state.inputActive = true;
+                state.activeField = false;
+            } else if (state.hoverPassword) {
+                state.inputActive = true;
+                state.activeField = true;
+            } else if (state.btnHover) {
+                if (checkUserAndPass(state.user, state.pass)) {
+                    state.showSuccess = true;
+                } else {
+                    if (checkUserExist(state.user)) {
+                        state.showError = true;
+                    } else {
+                        if (_tcslen(state.pass) > 0 && registerUser(state.user, state.pass)) {
+                            state.showSuccess = true;
+                        } else {
+                            state.showError = true;
+                        }
+                    }
+                    memset(state.user, 0, sizeof(state.user));
+                    memset(state.pass, 0, sizeof(state.pass));
+                }
+                state.inputActive = false;
+            } else {
+                state.inputActive = false;
+            }
+
+            if (state.inputActive) {
+                state.showCursor = true;
+                state.cursorTimer = clock();
+            }
+        }
+    }
+}
+
+// Function to draw UI elements
+void drawUI(UIState& state, const UIParams& params) {
+    cleardevice();
+    setlinestyle(PS_SOLID, 2);
+
+    // Username field
+    setlinecolor(state.inputActive && !state.activeField ? params.ACCENT : 
+                (state.hoverUsername ? params.HOVER_COLOR : params.WHITE_TEXT));
+    rectangle(params.x, params.y, params.x + params.boxWidth, params.y + params.boxHeight);
+
+    // Password field
+    setlinecolor(state.inputActive && state.activeField ? params.ACCENT : 
+                (state.hoverPassword ? params.HOVER_COLOR : params.WHITE_TEXT));
+    rectangle(params.x, params.y + 80, params.x + params.boxWidth, params.y + 80 + params.boxHeight);
+
+    // Draw labels and input content
+    settextcolor(params.WHITE_TEXT);
+    outtextxy(params.x - 120, params.y + 10, _T("Username:"));
+    outtextxy(params.x - 120, params.y + 90, _T("Password:"));
+    outtextxy(params.x + 20, params.y + 10, state.user);
+    outtextxy(params.x + 20, params.y + 90, state.pass);
+
+    // Draw cursor
+    if (clock() - state.cursorTimer > 500 && state.inputActive) {
+        state.showCursor = !state.showCursor;
+        state.cursorTimer = clock();
+    }
+    if (state.showCursor && state.inputActive) {
+        int textWidth = state.activeField ? textwidth(state.pass) : textwidth(state.user);
+        int baseY = state.activeField ? params.y + 90 : params.y + 10;
+        line(params.x + 20 + textWidth, baseY + 5, params.x + 20 + textWidth, baseY + 35);
+    }
+
+    // Login button
+    int btnX = params.x + (params.boxWidth - params.btnWidth) / 2;
+    int btnY = params.y + 180;
+    setlinecolor(state.btnHover ? params.ACCENT : params.WHITE_TEXT);
+    roundrect(btnX, btnY, btnX + params.btnWidth, btnY + params.btnHeight, 10, 10);
+
+    // Button text
+    settextcolor(params.WHITE_TEXT);
+    int textWidth = textwidth(_T("LOGIN"));
+    outtextxy(btnX + (params.btnWidth - textWidth) / 2, btnY + 15, _T("LOGIN"));
+
+    // Status messages
+    int msgY = btnY + params.btnHeight + 30;
+    if (state.showError) {
+        settextcolor(params.ERROR_RED);
+        const TCHAR* msg = _T("Invalid credentials!");
+        outtextxy(params.screenWidth / 2 - textwidth(msg) / 2, msgY, msg);
+    }
+    if (state.showSuccess) {
+        settextcolor(params.SUCCESS_GREEN);
+        const TCHAR* msg = _T("Welcome!");
+        outtextxy(params.screenWidth / 2 - textwidth(msg) / 2, msgY, msg);
+        FlushBatchDraw();
+        
+        // Handle successful login
+        FILE* savesFile = _tfopen(_T("saves.txt"), _T("r"));
+        if (savesFile) {
+            TCHAR line[256];
+            while (_fgetts(line, sizeof(line) / sizeof(TCHAR), savesFile)) {
+                TCHAR username[16], password[16];
+                _stscanf(line, _T("{[%[^,],%[^]]]}"), username, password);
+                if (_tcscmp(state.user, username) == 0) {
+                    FILE* activeUserFile = _tfopen(_T("activeUser.txt"), _T("w"));
+                    if (activeUserFile) {
+                        _ftprintf(activeUserFile, _T("%s"), line);
+                        fclose(activeUserFile);
+                    }
+                    break;
+                }
+            }
+            fclose(savesFile);
+        }
+
+        // Show loading animation
+        Sleep(1500);
+        int msgX = params.screenWidth / 2 - textwidth(_T("Starting game...")) / 2;
+        msg = _T("Starting game.");
+        outtextxy(msgX, msgY, msg);
+        FlushBatchDraw();
+        Sleep(500);
+        msg = _T("Starting game..");
+        outtextxy(msgX, msgY, msg);
+        FlushBatchDraw();
+        Sleep(500);
+        msg = _T("Starting game...");
+        outtextxy(msgX, msgY, msg);
+        FlushBatchDraw();
+        system("start gameCore.exe");
+        Sleep(500);
+    }
+
+    // Draw game elements
+    drawAATower(params.screenWidth, params.screenHeight, state.angle);
+    drawAABatteries(params.screenWidth, params.screenHeight);
+    addAABatteriesProjectiles(params.screenWidth, params.screenHeight);
+    simulateFiring();
+    
+    // Update searchlight angle
+    state.angle = (state.angle + 1) % 360;
+}
+
+// Main game loop function
+bool gameLoop(UIState& state, const UIParams& params) {
+    handleMouseInput(state, params);
+    handleKeyboardInput(state);
+    drawUI(state, params);
+    
+    FlushBatchDraw();
+    Sleep(10);
+    
+    return !state.showSuccess;
+}
+
 int main() {
-    // Initialize graphics window
-    int screenWidth = GetSystemMetrics(SM_CXSCREEN);
-    int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-    initgraph(screenWidth, screenHeight, SHOWCONSOLE);
+    // Initialize graphics window and UI parameters
+    UIParams params = initializeUI();
+    initgraph(params.screenWidth, params.screenHeight, SHOWCONSOLE);
     BeginBatchDraw();
 
-    // Color scheme
-    const COLORREF DARK_BG = RGB(30, 30, 36);
-    const COLORREF ACCENT = RGB(0, 145, 255);
-    const COLORREF ERROR_RED = RGB(255, 80, 80);
-    const COLORREF SUCCESS_GREEN = RGB(80, 255, 80);
-    const COLORREF WHITE_TEXT = RGB(240, 240, 240);
-    const COLORREF HOVER_COLOR = RGB(100, 100, 110);
+    // Initialize UI state
+    UIState state = initializeUIState();
 
-    // UI parameters
-    const int boxWidth = 400, boxHeight = 50;
-    const int btnWidth = 200, btnHeight = 50;
-    int x = (screenWidth - boxWidth) / 2;
-    int y = screenHeight / 3;
-
-    // Input states
-    TCHAR user[16] = {0};
-    TCHAR pass[16] = {0};
-    bool activeField = false;  // false: username, true: password
-    bool inputActive = false;
-    clock_t cursorTimer = clock();
-    bool showCursor = false;
-    bool showError = false;
-    bool showSuccess = false;
-    bool btnHover = false;
-    bool hoverUsername = false;
-    bool hoverPassword = false;
-
-    setbkcolor(DARK_BG);
+    // Set up graphics settings
+    setbkcolor(params.DARK_BG);
     cleardevice();
     settextstyle(24, 0, _T("Arial"));
-    MOUSEMSG m;
 
-    int angle = 0; // Angle for the searchlights
-    clock_t lastFiringTime = 0; // Time for the last firing from batteries
-
-    while (true) {
-        cleardevice();
-
-        // Draw input fields
-        setlinestyle(PS_SOLID, 2);
-
-        // Username field
-        setlinecolor(inputActive && !activeField ? ACCENT : (hoverUsername ? HOVER_COLOR : WHITE_TEXT));
-        rectangle(x, y, x + boxWidth, y + boxHeight);
-
-        // Password field
-        setlinecolor(inputActive && activeField ? ACCENT : (hoverPassword ? HOVER_COLOR : WHITE_TEXT));
-        rectangle(x, y + 80, x + boxWidth, y + 80 + boxHeight);
-
-        // Draw labels
-        settextcolor(WHITE_TEXT);
-        outtextxy(x - 120, y + 10, _T("Username:"));
-        outtextxy(x - 120, y + 90, _T("Password:"));
-
-        // Draw input content
-        settextcolor(WHITE_TEXT);
-        outtextxy(x + 20, y + 10, user);
-        outtextxy(x + 20, y + 90, pass);
-
-        // Draw cursor
-        if (clock() - cursorTimer > 500 && inputActive) {
-            showCursor = !showCursor;
-            cursorTimer = clock();
-        }
-        if (showCursor && inputActive) {
-            int textWidth = activeField ? textwidth(pass) : textwidth(user);
-            int baseY = activeField ? y + 90 : y + 10;
-            line(x + 20 + textWidth, baseY + 5, x + 20 + textWidth, baseY + 35);
-        }
-
-        // Login button (centered)
-        int btnX = x + (boxWidth - btnWidth) / 2;
-        int btnY = y + 180;
-        setlinestyle(PS_SOLID, 2);
-        setlinecolor(btnHover ? ACCENT : WHITE_TEXT);
-        roundrect(btnX, btnY, btnX + btnWidth, btnY + btnHeight, 10, 10);
-
-        // Button text
-        settextcolor(WHITE_TEXT);
-        int textWidth = textwidth(_T("LOGIN"));
-        outtextxy(btnX + (btnWidth - textWidth) / 2, btnY + 15, _T("LOGIN"));
-
-        // Status messages
-        int msgY = btnY + btnHeight + 30;
-        if (showError) {
-            settextcolor(ERROR_RED);
-            const TCHAR* msg = _T("Invalid credentials!");
-            outtextxy(screenWidth / 2 - textwidth(msg) / 2, msgY, msg);
-        }
-        if (showSuccess) {
-            settextcolor(SUCCESS_GREEN);
-            const TCHAR* msg = _T("Welcome!");
-            outtextxy(screenWidth / 2 - textwidth(msg) / 2, msgY, msg);
-            FlushBatchDraw();
-            // Read user data from saves.txt and write to activeUser.txt
-            FILE* savesFile = _tfopen(_T("saves.txt"), _T("r"));
-            if (savesFile) {
-                TCHAR line[256];
-                while (_fgetts(line, sizeof(line) / sizeof(TCHAR), savesFile)) {
-                    TCHAR username[16], password[16];
-                    _stscanf(line, _T("{[%[^,],%[^]]]}"), username, password);
-                    if (_tcscmp(user, username) == 0) {
-                        FILE* activeUserFile = _tfopen(_T("activeUser.txt"), _T("w"));
-                        if (activeUserFile) {
-                            _ftprintf(activeUserFile, _T("%s"), line);
-                            fclose(activeUserFile);
-                        }
-                        break;
-                    }
-                }
-                fclose(savesFile);
-            }
-            Sleep(1500);
-            int msgX = screenWidth / 2 - textwidth(_T("Starting game...")) / 2;
-            msg = _T("Starting game.");
-            outtextxy(msgX, msgY, msg);
-            FlushBatchDraw();
-            Sleep(500);
-            msg = _T("Starting game..");
-            outtextxy(msgX, msgY, msg);
-            FlushBatchDraw();
-            Sleep(500);
-            msg = _T("Starting game...");
-            outtextxy(msgX, msgY, msg);
-            FlushBatchDraw();
-            system("start gameCore.exe");
-            Sleep(500);
-            EndBatchDraw();
-            closegraph();
-            return 0;
-        }
-
-        // Mouse handling
-        if (MouseHit()) {
-            hoverUsername = hoverPassword = btnHover = false;
-            m = GetMouseMsg();
-            POINT pt = {m.x, m.y};
-
-            // Hover detection
-            hoverUsername = (pt.x > x && pt.x < x + boxWidth && pt.y > y && pt.y < y + boxHeight);
-            hoverPassword = (pt.x > x && pt.x < x + boxWidth && pt.y > y + 80 && pt.y < y + 80 + boxHeight);
-            btnHover = (pt.x > btnX && pt.x < btnX + btnWidth && pt.y > btnY && pt.y < btnY + btnHeight);
-
-            if (m.uMsg == WM_LBUTTONDOWN) {
-                showError = false;
-                showSuccess = false;
-
-                // Handle input field clicks
-                if (hoverUsername) {
-                    inputActive = true;
-                    activeField = false;
-                } else if (hoverPassword) {
-                    inputActive = true;
-                    activeField = true;
-                } else if (btnHover) {
-                    if (checkUserAndPass(user, pass)) {
-                        showSuccess = true;
-                    } else {
-                        // Check if user exists
-                        if (checkUserExist(user)) {
-                            showError = true; // User exists but password doesn't match
-                        } else {
-                            // User doesn't exist, try to register
-                            if (_tcslen(pass) > 0 && registerUser(user, pass)) {
-                                showSuccess = true;
-                            } else {
-                                showError = true; // Empty password or registration failed
-                            }
-                        }
-                        memset(user, 0, sizeof(user));
-                        memset(pass, 0, sizeof(pass));
-                    }
-                    inputActive = false;
-                } else {
-                    inputActive = false;
-                }
-
-                if (inputActive) {
-                    showCursor = true;
-                    cursorTimer = clock();
-                }
-            }
-        }
-
-        // Keyboard handling
-        if (inputActive && _kbhit()) {
-            TCHAR ch = _getch();
-            TCHAR* target = activeField ? pass : user;
-            size_t len = _tcslen(target);
-
-            switch (ch) {
-                case '\b':
-                    if (len > 0) target[len - 1] = '\0';
-                    break;
-                case '\t':
-                    activeField = !activeField;
-                    break;
-                case '\r':
-                    inputActive = false;
-                    break;
-                default:
-                    if (len < 15 && ch >= 32 && ch <= 126) {
-                        target[len] = ch;
-                        target[len + 1] = '\0';
-                    }
-            }
-            showCursor = true;
-            cursorTimer = clock();
-        }
-
-        // Draw anti-aircraft tower and searchlights
-        drawAATower(screenWidth, screenHeight, angle);
-
-        // Draw anti-aircraft batteries
-        drawAABatteries(screenWidth, screenHeight);
-
-        // Add new projectiles
-        addAABatteriesProjectiles(screenWidth, screenHeight);
-
-        // Simulate firing
-        simulateFiring();
-
-        // Update the angle for the searchlights
-        angle = (angle + 1) % 360;
-
-        FlushBatchDraw();
-        Sleep(10); // Slower the firing animation
-    }
+    // Main game loop
+    while (gameLoop(state, params));
 
     EndBatchDraw();
     closegraph();
