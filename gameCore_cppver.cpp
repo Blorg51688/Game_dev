@@ -164,69 +164,8 @@ void handleCollision(Aircraft& plane) {
     }
 }
 
-// 定义飞机链表节点结构体
-struct AircraftNode {
-    Aircraft data;
-    struct AircraftNode* next;
-};
-
-// 飞机链表头指针
-struct AircraftNode* aircraftListHead = NULL;
+vector<Aircraft> aircrafts;
 clock_t lastAircraftGenTime = 0;
-
-// 添加飞机到链表
-void addAircraftToList(Aircraft newAircraft) {
-    // 创建新节点
-    struct AircraftNode* newNode = (struct AircraftNode*)malloc(sizeof(struct AircraftNode));
-    if (newNode == NULL) {
-        // 内存分配失败
-        return;
-    }
-    
-    // 设置节点数据
-    newNode->data = newAircraft;
-    newNode->next = NULL;
-    
-    // 如果链表为空，新节点成为头节点
-    if (aircraftListHead == NULL) {
-        aircraftListHead = newNode;
-        return;
-    }
-    
-    // 否则，将新节点添加到链表末尾
-    struct AircraftNode* current = aircraftListHead;
-    while (current->next != NULL) {
-        current = current->next;
-    }
-    current->next = newNode;
-}
-
-// 从链表中删除节点
-void removeAircraftNode(struct AircraftNode** prevPtr, struct AircraftNode* nodeToRemove) {
-    // 如果是头节点
-    if (*prevPtr == NULL) {
-        aircraftListHead = nodeToRemove->next;
-    } else {
-        (*prevPtr)->next = nodeToRemove->next;
-    }
-    
-    // 释放节点内存
-    free(nodeToRemove);
-}
-
-// 清理整个飞机链表
-void cleanupAircraftList() {
-    struct AircraftNode* current = aircraftListHead;
-    struct AircraftNode* next;
-    
-    while (current != NULL) {
-        next = current->next;
-        free(current);
-        current = next;
-    }
-    
-    aircraftListHead = NULL;
-}
 
 // 在游戏循环前添加飞机生成函数
 void generateAircrafts() {
@@ -280,7 +219,7 @@ void generateAircrafts() {
         
         // 计算具体生成高度
         int zoneHeight = genAreaHeight / 3;
-        // 将高度区域反向计算 (2 - altitudeZone)
+// 将高度区域反向计算 (2 - altitudeZone)
         newPlane.y = genAreaTop + ((2 - altitudeZone) * zoneHeight) + rand() % (zoneHeight - 40);
 
         
@@ -301,27 +240,19 @@ void generateAircrafts() {
         }
         
         newPlane.x = (newPlane.direction == 1) ? -100 : screenWidth + 100;
-        // 使用链表添加飞机，而不是vector
-        addAircraftToList(newPlane);
+        aircrafts.push_back(newPlane);
         lastAircraftGenTime = clock();
     }
 }
 
 // 添加飞机更新函数
 void updateAircrafts() {
-    struct AircraftNode* current = aircraftListHead;
-    struct AircraftNode* prev = NULL;
-    
-    while (current != NULL) {
-        // 保存下一个节点的指针，因为当前节点可能会被删除
-        struct AircraftNode* next = current->next;
-        
-        // 更新飞机位置
-        current->data.x += current->data.speed * current->data.direction;
+    for (auto it = aircrafts.begin(); it != aircrafts.end();) {
+        it->x += it->speed * it->direction;
         
         // 检查飞机血量是否低于一半，根据机型判断初始血量
         int initialHealth;
-        switch(current->data.type) {
+        switch(it->type) {
             case LIGHT: initialHealth = 40; break;
             case MEDIUM: initialHealth = 60; break;
             case HEAVY: initialHealth = 100; break;
@@ -329,73 +260,63 @@ void updateAircrafts() {
         }
         
         // 如果血量低于一半，增加垂直速度以模拟下坠
-        if (current->data.health < initialHealth / 2) {
-            if (current->data.verticalSpeed == 0) {
+        if (it->health < initialHealth / 2) {
+            if (it->verticalSpeed == 0) {
                 // 根据飞机的初始速度设置初始下落速度
-                current->data.verticalSpeed = 0.1f * (current->data.speed / 6.0f); // 以最快的轻型飞机速度(6.0)为基准
+                it->verticalSpeed = 0.1f * (it->speed / 6.0f); // 以最快的轻型飞机速度(6.0)为基准
             }
             // 垂直加速度也与飞机速度成正比
-            current->data.verticalSpeed += 0.05f * (current->data.speed / 6.0f);
-            current->data.y += current->data.verticalSpeed;
+            it->verticalSpeed += 0.05f * (it->speed / 6.0f);
+            it->y += it->verticalSpeed;
         }
         
         // 重置击中状态
-        if (current->data.isHit && clock() - current->data.hitTime >= 100) {
-            current->data.isHit = false;
+        if (it->isHit && clock() - it->hitTime >= 100) {
+            it->isHit = false;
         }
 
         // 更新爆炸动画
-        if (current->data.isDying) {
-            float maxRadius = 6000.0f;
+        if (it->isDying) {
+            float maxRadius=6000.0f;
             
-            float timeSinceDeath = (clock() - current->data.deathTime) / 1000.0f;
+            float timeSinceDeath = (clock() - it->deathTime) / 1000.0f;
             
             // 更新爆炸圆的半径
             if (timeSinceDeath < 0.5f) {
-                current->data.explosionRadius = maxRadius * timeSinceDeath;
+                it->explosionRadius = maxRadius * timeSinceDeath;
                 setfillcolor(RGB(255, 0, 0));
-                circle(current->data.x, current->data.y, current->data.explosionRadius);
+                circle(it->x, it->y, it->explosionRadius);
             } else {
-                // 爆炸动画结束，删除节点
-                removeAircraftNode(&prev, current);
-                current = next;
+                it = aircrafts.erase(it);
                 continue;
             }
         }
         
         // 检查是否需要移除飞机
-        if (!current->data.isDying && (
-            (current->data.direction == 1 && current->data.x > screenWidth + 100) ||
-            (current->data.direction == -1 && current->data.x < -100) ||
-            current->data.y > screenHeight + 100)) {
-            removeAircraftNode(&prev, current);
+        if (!it->isDying && (
+            (it->direction == 1 && it->x > screenWidth + 100) ||
+            (it->direction == -1 && it->x < -100) ||
+            it->y > screenHeight + 100)) {
+            it = aircrafts.erase(it);
         } else {
-            // 只有当节点没有被删除时，才更新prev指针
-            prev = current;
+            ++it;
         }
-        
-        // 移动到下一个节点
-        current = next;
     }
 }
 // 改进后的飞机绘制函数
 void drawAircrafts() {
-    struct AircraftNode* current = aircraftListHead;
-    
-    while (current != NULL) {
-        // 获取当前飞机数据的引用，使代码更简洁
-        const Aircraft* plane = &(current->data);
-        COLORREF mainColor, subColor, cockpitColor = RGB(255, 165, 0);
-        double d = plane->direction;
+    for (const auto& plane : aircrafts) {
+        COLORREF mainColor,subColor,cockpitColor=RGB(255, 165, 0);
+        double d=plane.direction;
 
         // 如果飞机被击中且在闪白时间内（100毫秒），使用白色绘制
-        if (plane->isHit && clock() - plane->hitTime < 100) {
+        if (plane.isHit && clock() - plane.hitTime < 100) {
             mainColor = RGB(255, 255, 255);
             subColor = RGB(255, 255, 255);
             cockpitColor = RGB(255, 255, 255);
         } else {
             // 根据机型定制特征
-            switch(plane->type) {
+            switch(plane.type) {
                 case LIGHT:
                     mainColor = RGB(173, 216, 230);
                     subColor = RGB(32,93,93);
@@ -416,138 +337,135 @@ void drawAircrafts() {
         }
 
         // 如果飞机处于死亡状态，不绘制飞机模型
-        if (!plane->isDying) {
+        if (!plane.isDying) {
             // 根据机型绘制飞机
-            switch(plane->type) {
+            switch(plane.type) {
                 case LIGHT:
                     //body
                     setfillcolor(mainColor*0.9);
-                    fillrectangle(plane->x - d * 20, plane->y - 10, plane->x + d * 20, plane->y + 10);
-                    fillrectangle(plane->x - d * 50, plane->y - 0, plane->x - d * 20, plane->y + 10);
-                    fillrectangle(plane->x - d * 60, plane->y - 10, plane->x - d * 50, plane->y + 10);
+                    fillrectangle(plane.x - d * 20, plane.y - 10, plane.x + d * 20, plane.y + 10);
+                    fillrectangle(plane.x - d * 50, plane.y - 0, plane.x - d * 20, plane.y + 10);
+                    fillrectangle(plane.x - d * 60, plane.y - 10, plane.x - d * 50, plane.y + 10);
                     //wing
                     setfillcolor(subColor);
-                    fillrectangle(plane->x - d * 18, plane->y + 8, plane->x + d * 18, plane->y + 12);
-                    fillrectangle(plane->x - d * 60, plane->y + 4, plane->x - d * 50, plane->y + 8);
+                    fillrectangle(plane.x - d * 18, plane.y + 8, plane.x + d * 18, plane.y + 12);
+                    fillrectangle(plane.x - d * 60, plane.y + 4, plane.x - d * 50, plane.y + 8);
                     //propeller
-                    fillrectangle(plane->x + d * 20, plane->y - 3, plane->x + d * 25, plane->y + 3);
+                    fillrectangle(plane.x + d * 20, plane.y - 3, plane.x + d * 25, plane.y + 3);
                     if(rand()%3==0){
-                        fillrectangle(plane->x + d * 25, plane->y - 15, plane->x + d * 30, plane->y + 15);
+                        fillrectangle(plane.x + d * 25, plane.y - 15, plane.x + d * 30, plane.y + 15);
                     }else if(rand()%3==1){
-                        fillrectangle(plane->x + d * 25, plane->y - 10, plane->x + d * 30, plane->y + 10);
+                        fillrectangle(plane.x + d * 25, plane.y - 10, plane.x + d * 30, plane.y + 10);
                     }else{
-                        fillrectangle(plane->x + d * 25, plane->y - 3, plane->x + d * 30, plane->y + 3);
+                        fillrectangle(plane.x + d * 25, plane.y - 3, plane.x + d * 30, plane.y + 3);
                     }
                     //cockpit
                     setfillcolor(cockpitColor);
-                    fillrectangle(plane->x - d * 0, plane->y - 13, plane->x + d * 15, plane->y - 7);
+                    fillrectangle(plane.x - d * 0, plane.y - 13, plane.x + d * 15, plane.y - 7);
                     break;
 
                 case MEDIUM:
                     //body
                     setfillcolor(mainColor);
-                    fillrectangle(plane->x - d * 20, plane->y - 15, plane->x + d * 20, plane->y + 15);
-                    fillrectangle(plane->x - d * 30, plane->y - 10, plane->x - d * 20, plane->y + 10);
-                    fillrectangle(plane->x - d * 60, plane->y - 0, plane->x - d * 30, plane->y + 10);
-                    fillrectangle(plane->x - d * 70, plane->y - 15, plane->x - d * 60, plane->y + 10);
-                    fillrectangle(plane->x + d * 20, plane->y - 5, plane->x + d * 30, plane->y + 15);
+                    fillrectangle(plane.x - d * 20, plane.y - 15, plane.x + d * 20, plane.y + 15);
+                    fillrectangle(plane.x - d * 30, plane.y - 10, plane.x - d * 20, plane.y + 10);
+                    fillrectangle(plane.x - d * 60, plane.y - 0, plane.x - d * 30, plane.y + 10);
+                    fillrectangle(plane.x - d * 70, plane.y - 15, plane.x - d * 60, plane.y + 10);
+                    fillrectangle(plane.x + d * 20, plane.y - 5, plane.x + d * 30, plane.y + 15);
                     //wing
                     setfillcolor(subColor);
-                    fillrectangle(plane->x - d * 18, plane->y + 12, plane->x + d * 18, plane->y + 18);
-                    fillrectangle(plane->x - d * 70, plane->y + 4, plane->x - d * 50, plane->y + 8);
+                    fillrectangle(plane.x - d * 18, plane.y + 12, plane.x + d * 18, plane.y + 18);
+                    fillrectangle(plane.x - d * 70, plane.y + 4, plane.x - d * 50, plane.y + 8);
                     //propeller
-                    fillrectangle(plane->x + d * 30, plane->y + 2, plane->x + d * 35, plane->y + 8);
+                    fillrectangle(plane.x + d * 30, plane.y + 2, plane.x + d * 35, plane.y + 8);
                     if(rand()%3==0){
-                        fillrectangle(plane->x + d * 35, plane->y - 15, plane->x + d * 40, plane->y + 25);
+                        fillrectangle(plane.x + d * 35, plane.y - 15, plane.x + d * 40, plane.y + 25);
                     }else if(rand()%3==1){
-                        fillrectangle(plane->x + d * 35, plane->y - 5, plane->x + d * 40, plane->y + 15);
+                        fillrectangle(plane.x + d * 35, plane.y - 5, plane.x + d * 40, plane.y + 15);
                     }else{
-                        fillrectangle(plane->x + d * 35, plane->y + 2, plane->x + d * 40, plane->y + 8);
+                        fillrectangle(plane.x + d * 35, plane.y + 2, plane.x + d * 40, plane.y + 8);
                     }
                     //cockpit
                     setfillcolor(cockpitColor);
-                    fillrectangle(plane->x + d * 1, plane->y - 18, plane->x + d * 15, plane->y - 12);
-                    fillrectangle(plane->x - d * 15, plane->y - 18, plane->x - d * 1, plane->y - 12);
+                    fillrectangle(plane.x + d * 1, plane.y - 18, plane.x + d * 15, plane.y - 12);
+                    fillrectangle(plane.x - d * 15, plane.y - 18, plane.x - d * 1, plane.y - 12);
                     break;
 
                 case HEAVY:
                     //body
                     setfillcolor(mainColor);
-                    fillrectangle(plane->x - d * 40, plane->y - 15, plane->x + d * 30, plane->y + 15);
-                    fillrectangle(plane->x - d * 80, plane->y - 15, plane->x - d * 40, plane->y + 0);
-                    fillrectangle(plane->x - d * 100, plane->y - 20, plane->x - d * 80, plane->y + 5);
+                    fillrectangle(plane.x - d * 40, plane.y - 15, plane.x + d * 30, plane.y + 15);
+                    fillrectangle(plane.x - d * 80, plane.y - 15, plane.x - d * 40, plane.y + 0);
+                    fillrectangle(plane.x - d * 100, plane.y - 20, plane.x - d * 80, plane.y + 5);
                     //wing
                     setfillcolor(subColor);
-                    fillrectangle(plane->x - d * 30, plane->y - 3, plane->x + d * 10, plane->y + 3);
-                    fillrectangle(plane->x - d * 10, plane->y + 3, plane->x + d * 10, plane->y + 13);
+                    fillrectangle(plane.x - d * 30, plane.y - 3, plane.x + d * 10, plane.y + 3);
+                    fillrectangle(plane.x - d * 10, plane.y + 3, plane.x + d * 10, plane.y + 13);
                     //propeller
-                    fillrectangle(plane->x + d * 10, plane->y + 5, plane->x + d * 15, plane->y + 11);
+                    fillrectangle(plane.x + d * 10, plane.y + 5, plane.x + d * 15, plane.y + 11);
                     if(rand()%3==0){
-                        fillrectangle(plane->x + d * 15, plane->y - 7, plane->x + d * 20, plane->y + 23);
+                        fillrectangle(plane.x + d * 15, plane.y - 7, plane.x + d * 20, plane.y + 23);
                     }else if(rand()%3==1){
-                        fillrectangle(plane->x + d * 15, plane->y - 0, plane->x + d * 20, plane->y + 16);
+                        fillrectangle(plane.x + d * 15, plane.y - 0, plane.x + d * 20, plane.y + 16);
                     }else{
-                        fillrectangle(plane->x + d * 15, plane->y + 5, plane->x + d * 20, plane->y + 11);
+                        fillrectangle(plane.x + d * 15, plane.y + 5, plane.x + d * 20, plane.y + 11);
                     }
                     //cockpit
                     setfillcolor(cockpitColor);
-                    fillrectangle(plane->x - d * 5, plane->y - 18, plane->x + d * 20, plane->y - 12);
+                    fillrectangle(plane.x - d * 5, plane.y - 18, plane.x + d * 20, plane.y - 12);
                     break;
 
                 case SUPER_HEAVY:
                     //body
                     setfillcolor(mainColor);
-                    fillrectangle(plane->x - d * 50, plane->y - 20, plane->x + d * 50, plane->y + 20);
-                    fillrectangle(plane->x - d * 90, plane->y - 20, plane->x - d * 50, plane->y + 10);
-                    fillrectangle(plane->x - d * 130, plane->y - 20, plane->x - d * 90, plane->y + 0);
-                    fillrectangle(plane->x - d * 150, plane->y - 30, plane->x - d * 130, plane->y + 10);
+                    fillrectangle(plane.x - d * 50, plane.y - 20, plane.x + d * 50, plane.y + 20);
+                    fillrectangle(plane.x - d * 90, plane.y - 20, plane.x - d * 50, plane.y + 10);
+                    fillrectangle(plane.x - d * 130, plane.y - 20, plane.x - d * 90, plane.y + 0);
+                    fillrectangle(plane.x - d * 150, plane.y - 30, plane.x - d * 130, plane.y + 10);
                     //wing
                     setfillcolor(subColor);
-                    fillrectangle(plane->x - d * 30, plane->y - 3, plane->x + d * 30, plane->y + 3);
-                    fillrectangle(plane->x + d * 10, plane->y + 3, plane->x + d * 30, plane->y + 13);
-                    fillrectangle(plane->x - d * 5, plane->y + 3, plane->x + d * 15, plane->y + 13);
+                    fillrectangle(plane.x - d * 30, plane.y - 3, plane.x + d * 30, plane.y + 3);
+                    fillrectangle(plane.x + d * 10, plane.y + 3, plane.x + d * 30, plane.y + 13);
+                    fillrectangle(plane.x - d * 5, plane.y + 3, plane.x + d * 15, plane.y + 13);
                     //propeller
-                    fillrectangle(plane->x + d * 30, plane->y + 5, plane->x + d * 35, plane->y + 11);
-                    fillrectangle(plane->x + d * 15, plane->y + 5, plane->x + d * 20, plane->y + 11);
+                    fillrectangle(plane.x + d * 30, plane.y + 5, plane.x + d * 35, plane.y + 11);
+                    fillrectangle(plane.x + d * 15, plane.y + 5, plane.x + d * 20, plane.y + 11);
                     if(rand()%3==0){
-                        fillrectangle(plane->x + d * 35, plane->y - 7, plane->x + d * 40, plane->y + 23);
+                        fillrectangle(plane.x + d * 35, plane.y - 7, plane.x + d * 40, plane.y + 23);
                     }else if(rand()%3==1){
-                        fillrectangle(plane->x + d * 35, plane->y - 0, plane->x + d * 40, plane->y + 16);
+                        fillrectangle(plane.x + d * 35, plane.y - 0, plane.x + d * 40, plane.y + 16);
                     }else{
-                        fillrectangle(plane->x + d * 35, plane->y + 5, plane->x + d * 40, plane->y + 11);
+                        fillrectangle(plane.x + d * 35, plane.y + 5, plane.x + d * 40, plane.y + 11);
                     }
                     if(rand()%3==0){
-                        fillrectangle(plane->x + d * 20, plane->y - 7, plane->x + d * 25, plane->y + 23);
+                        fillrectangle(plane.x + d * 20, plane.y - 7, plane.x + d * 25, plane.y + 23);
                     }else if(rand()%3==1){
-                        fillrectangle(plane->x + d * 20, plane->y - 0, plane->x + d * 25, plane->y + 16);
+                        fillrectangle(plane.x + d * 20, plane.y - 0, plane.x + d * 25, plane.y + 16);
                     }else{
-                        fillrectangle(plane->x + d * 20, plane->y + 5, plane->x + d * 25, plane->y + 11);
+                        fillrectangle(plane.x + d * 20, plane.y + 5, plane.x + d * 25, plane.y + 11);
                     }
                     //cockpit
                     setfillcolor(cockpitColor);
-                    fillrectangle(plane->x + d * 16, plane->y - 23, plane->x + d * 40, plane->y - 17);
-                    fillrectangle(plane->x - d * 10, plane->y - 23, plane->x + d * 14, plane->y - 17);
+                    fillrectangle(plane.x + d * 16, plane.y - 23, plane.x + d * 40, plane.y - 17);
+                    fillrectangle(plane.x - d * 10, plane.y - 23, plane.x + d * 14, plane.y - 17);
                     break;
             }
         } else {
             // 如果飞机处于死亡状态，绘制爆炸动画
             float maxRadius;
-            switch(plane->type) {
+            switch(plane.type) {
                 case LIGHT: maxRadius = 100.0f; break;
                 case MEDIUM: maxRadius = 200.0f; break;
                 case HEAVY: maxRadius = 400.0f; break;
                 case SUPER_HEAVY: maxRadius = 800.0f; break;
             }
             
-            float timeSinceDeath = (clock() - plane->deathTime) / 1000.0f;
+            float timeSinceDeath = (clock() - plane.deathTime) / 1000.0f;
             if (timeSinceDeath < 0.25f) {
                 setfillcolor(RGB(255, 0, 0));
-                solidcircle(plane->x, plane->y, maxRadius * timeSinceDeath);
+                solidcircle(plane.x, plane.y, maxRadius * timeSinceDeath);
             }
         }
-        
-        // 移动到下一个节点
-        current = current->next;
     }
 }
 
@@ -657,18 +575,16 @@ void simulateFiring() {
     for (auto it = projectiles.begin(); it != projectiles.end();) {
         bool projectileHit = false;
 
-        // 检查炮弹是否击中任何飞机 - 使用链表遍历
-        struct AircraftNode* current = aircraftListHead;
-        while (current != NULL) {
-            if (checkCollision(*it, current->data)) {
-                handleCollision(current->data);
+        // 检查炮弹是否击中任何飞机
+        for (auto& plane : aircrafts) {
+            if (checkCollision(*it, plane)) {
+                handleCollision(plane);
                 projectileHit = true;
                 // 显示爆炸效果
                 setfillcolor(RGB(255, 255, 0));
                 solidcircle(it->x, it->y, 30);
                 break;
             }
-            current = current->next;
         }
 
         if (currentTime >= it->fireTime && it->life > 0) {  // Check if it's time to fire the projectile
