@@ -13,7 +13,7 @@ struct Projectile {
     clock_t fireTime;
 };
 
-vector<Projectile> projectiles;
+queue<Projectile> projectiles;
 clock_t lastFiringTimeBattery1 = 0;
 clock_t lastFiringTimeBattery2 = 0;
 
@@ -31,7 +31,6 @@ const float HEAT_INCREASE_RATE = 5.0f;  // 每次射击增加的过热度
 const float HEAT_DECREASE_RATE = 1.0f;  // 每帧冷却的过热度
 const int TOWER_FIRE_COOLDOWN = 200;    // 射击冷却时间(毫秒)
 
-// 全局游戏数据
 // 全局游戏数据
 char global_username[21] = {0};
 char global_password[21] = {0};
@@ -230,6 +229,7 @@ void cleanupAircraftList() {
 
 // 在游戏循环前添加飞机生成函数
 void generateAircrafts() {
+    if (score >= 10000) return;
     if (clock() - lastAircraftGenTime > rand() % 3000 + 2000) { // 2-5秒生成间隔
         Aircraft newPlane;
         newPlane.type = static_cast<AircraftType>(rand() % 4);
@@ -301,7 +301,6 @@ void generateAircrafts() {
         }
         
         newPlane.x = (newPlane.direction == 1) ? -100 : screenWidth + 100;
-        // 使用链表添加飞机，而不是vector
         addAircraftToList(newPlane);
         lastAircraftGenTime = clock();
     }
@@ -337,6 +336,12 @@ void updateAircrafts() {
             // 垂直加速度也与飞机速度成正比
             current->data.verticalSpeed += 0.05f * (current->data.speed / 6.0f);
             current->data.y += current->data.verticalSpeed;
+            
+            // 检查飞机是否触底，如果触底则立刻将血量清零
+            if (current->data.y >= screenHeight - 50 && !current->data.isDying) {
+                current->data.health = 0;
+                handleCollision(current->data);
+            }
         }
         
         // 重置击中状态
@@ -559,7 +564,7 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
     int batteryY = screenHeight - 30;
 
     // Check if battery 1 is ready to fire
-    if (clock() - lastFiringTimeBattery1 > rand() % 3000 + 1000) { // Random cooldown
+    if (score < 10000 && clock() - lastFiringTimeBattery1 > rand() % 3000 + 1000) { // 胜利后停止射击
         // Calculate firing angle for battery 1
         float angle1 = 45.0f + static_cast<float>(rand() % 90); // Angle between 30 and 60 degrees
 
@@ -571,14 +576,14 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
             p1.life = 2000; // Projectile lifetime
             p1.angle = angle1; // Store firing angle
             p1.fireTime = clock() + i * 100; // Staggered firing timing
-            projectiles.push_back(p1);
+            projectiles.push(p1);
         }
 
         lastFiringTimeBattery1 = clock(); // Update last firing time
     }
 
     // Check if battery 2 is ready to fire
-    if (clock() - lastFiringTimeBattery2 > rand() % 3000 + 1000) { // Random cooldown
+    if (score < 10000 && clock() - lastFiringTimeBattery2 > rand() % 3000 + 1000) { // 胜利后停止射击
         // Calculate firing angle for battery 2
         float angle2 = 45.0f + static_cast<float>(rand() % 90); // Angle between 30 and 60 degrees
 
@@ -590,7 +595,7 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
             p2.life = 2000; // Projectile lifetime
             p2.angle = angle2; // Store firing angle
             p2.fireTime = clock() + i * 100; // Staggered firing timing
-            projectiles.push_back(p2);
+            projectiles.push(p2);
         }
 
         lastFiringTimeBattery2 = clock(); // Update last firing time
@@ -626,7 +631,7 @@ void addAATowerProjectiles(int screenWidth, int screenHeight) {
             p.life = 2000; // 炮弹生命周期
             p.angle = angle; // 存储射击角度
             p.fireTime = clock(); // 立即发射
-            projectiles.push_back(p);
+            projectiles.push(p);
             
             // 更新上次射击时间
             lastFiringTimeTower = clock();
@@ -653,41 +658,58 @@ void simulateFiring() {
     // Update and render projectiles
     double pSpeed = 10.0; // Projectile speed
     clock_t currentTime = clock(); // Get the current time once
-
-    for (auto it = projectiles.begin(); it != projectiles.end();) {
+    
+    // 使用临时队列来保存遍历过程中的元素
+    queue<Projectile> tempQueue;
+    int queueSize = projectiles.size();
+    
+    // 遍历队列中的所有炮弹
+    for (int i = 0; i < queueSize; i++) {
+        // 获取队首元素
+        Projectile currentProj = projectiles.front();
+        projectiles.pop(); // 从原队列中移除
+        
         bool projectileHit = false;
-
+        
         // 检查炮弹是否击中任何飞机 - 使用链表遍历
         struct AircraftNode* current = aircraftListHead;
         while (current != NULL) {
-            if (checkCollision(*it, current->data)) {
+            if (checkCollision(currentProj, current->data)) {
                 handleCollision(current->data);
                 projectileHit = true;
                 // 显示爆炸效果
                 setfillcolor(RGB(255, 255, 0));
-                solidcircle(it->x, it->y, 30);
+                solidcircle(currentProj.x, currentProj.y, 30);
                 break;
             }
             current = current->next;
         }
-
-        if (currentTime >= it->fireTime && it->life > 0) {  // Check if it's time to fire the projectile
+        
+        if (currentTime >= currentProj.fireTime && currentProj.life > 0) {  // Check if it's time to fire the projectile
             if (projectileHit) {
-                it = projectiles.erase(it);
+                // 被击中的炮弹不放回队列
                 continue;
             }
             setfillcolor(RGB(255, 0, 0)); // 设置炮弹颜色
-            solidcircle(it->x, it->y, 3); // Draw projectile
-            it->y -= pSpeed * sin(it->angle * 3.14159265 / 180); // Move the projectile based on its angle
-            it->x += pSpeed * cos(it->angle * 3.14159265 / 180); // Move to the direction of the angle
-            it->life--; // Decrease life
-            ++it;
-        } else if (it->life <= 0) {
-            it = projectiles.erase(it); // Remove expired projectiles
+            solidcircle(currentProj.x, currentProj.y, 3); // Draw projectile
+            currentProj.y -= pSpeed * sin(currentProj.angle * 3.14159265 / 180); // Move the projectile based on its angle
+            currentProj.x += pSpeed * cos(currentProj.angle * 3.14159265 / 180); // Move to the direction of the angle
+            currentProj.life--; // Decrease life
+            
+            // 如果炮弹仍然有生命值，放回临时队列
+            if (currentProj.life > 0) {
+                tempQueue.push(currentProj);
+            }
+        } else if (currentProj.life <= 0) {
+            // 生命值为0的炮弹不放回队列
         } else {
-            ++it; // Move to the next projectile
+            // 未到发射时间的炮弹放回队列
+            tempQueue.push(currentProj);
         }
     }
+    
+    // 将临时队列中的元素放回原队列
+    projectiles = tempQueue;
 }
 
 
@@ -961,7 +983,17 @@ void gameLoop() {
         simulateFiring();
 
         drawGameStats();
-        
+
+        if (score >= 10000) {
+            settextcolor(RGB(255, 215, 0));
+            settextstyle(48, 0, _T("Arial"));
+            outtextxy(screenWidth/2 - 300, screenHeight/2 - 50, _T("Enemy is retreating! Our city is saved!"));
+            
+            settextcolor(RGB(50, 205, 50));
+            settextstyle(24, 0, _T("Arial"));
+            outtextxy(screenWidth/2 - 150, 50, _T("Press ESC to save and exit"));
+        }
+
         FlushBatchDraw();
         Sleep(10);
     }
