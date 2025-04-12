@@ -31,6 +31,13 @@ const float HEAT_INCREASE_RATE = 5.0f;  // 每次射击增加的过热度
 const float HEAT_DECREASE_RATE = 1.0f;  // 每帧冷却的过热度
 const int TOWER_FIRE_COOLDOWN = 200;    // 射击冷却时间(毫秒)
 
+// 锁定飞机相关变量
+bool isTargetLocked = false;  // 是否锁定了目标飞机
+struct AircraftNode* lockedTarget = NULL;  // 被锁定的飞机指针
+float currentSpotlightAngle1 = 0.0f;  // 当前探照灯1的角度
+float currentSpotlightAngle2 = 0.0f;  // 当前探照灯2的角度
+const float SPOTLIGHT_ROTATION_SPEED = 3.0f;  // 探照灯旋转速度(度/帧)
+
 // 全局游戏数据
 char global_username[21] = {0};
 char global_password[21] = {0};
@@ -566,7 +573,24 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
     // Check if battery 1 is ready to fire
     if (score < 10000 && clock() - lastFiringTimeBattery1 > rand() % 3000 + 1000) { // 胜利后停止射击
         // Calculate firing angle for battery 1
-        float angle1 = 45.0f + static_cast<float>(rand() % 90); // Angle between 30 and 60 degrees
+        float angle1;
+        
+        // 如果有飞机被锁定，瞄准该飞机射击
+        if (isTargetLocked && lockedTarget != NULL) {
+            // 计算从防空阵地1到锁定飞机的角度
+            float dx = lockedTarget->data.x - battery1X;
+            float dy = lockedTarget->data.y - batteryY;
+            float targetAngleRad = atan2(-dy, dx);
+            angle1 = targetAngleRad * 180.0f / 3.14159265f;
+            
+            // 确保角度在合理范围内（向上射击）
+            if (angle1 < 0) angle1 += 360.0f;
+            // 限制角度在30-150度范围内
+            angle1 = max(30.0f, min(150.0f, angle1));
+        } else {
+            // 未锁定目标时使用随机角度
+            angle1 = 45.0f + static_cast<float>(rand() % 90); // 角度在45到135度之间
+        }
 
         // Create projectiles for battery 1
         for (int i = 0; i < (rand()%8)+2 ; ++i) {
@@ -585,7 +609,24 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
     // Check if battery 2 is ready to fire
     if (score < 10000 && clock() - lastFiringTimeBattery2 > rand() % 3000 + 1000) { // 胜利后停止射击
         // Calculate firing angle for battery 2
-        float angle2 = 45.0f + static_cast<float>(rand() % 90); // Angle between 30 and 60 degrees
+        float angle2;
+        
+        // 如果有飞机被锁定，瞄准该飞机射击
+        if (isTargetLocked && lockedTarget != NULL) {
+            // 计算从防空阵地2到锁定飞机的角度
+            float dx = lockedTarget->data.x - battery2X;
+            float dy = lockedTarget->data.y - batteryY;
+            float targetAngleRad = atan2(-dy, dx);
+            angle2 = targetAngleRad * 180.0f / 3.14159265f;
+            
+            // 确保角度在合理范围内（向上射击）
+            if (angle2 < 0) angle2 += 360.0f;
+            // 限制角度在30-150度范围内
+            angle2 = max(30.0f, min(150.0f, angle2));
+        } else {
+            // 未锁定目标时使用随机角度
+            angle2 = 45.0f + static_cast<float>(rand() % 90); // 角度在45到135度之间
+        }
 
         // Create projectiles for battery 2
         for (int i = 0; i < (rand()%8)+2 ; ++i) {
@@ -731,18 +772,115 @@ void drawAATower(int screenWidth, int screenHeight, int angle) {
     rectangle(baseX + 60, baseY - towerHeight - 10, baseX + 40, baseY - towerHeight + 10);
     rectangle(baseX + 100, baseY - 20, baseX + 20, baseY);
 
-    // Draw the top lights
+    // 探照灯起始位置
     int light1X1 = baseX - 50;
     int light1Y1 = baseY - towerHeight;
-    int light1X2 = light1X1 + 2000 * cos((abs(45 - (0.25 * ((angle) % 360))) + 90) * 3.14159265 / 180); // Extend to screen edge
-    int light1Y2 = light1Y1 - 2000 * sin((abs(45 - (0.25 * ((angle) % 360))) + 90) * 3.14159265 / 180); // Extend to screen edge
-
     int light2X1 = baseX + 50;
     int light2Y1 = baseY - towerHeight;
-    int light2X2 = light2X1 + 2000 * cos((abs(45 - (0.25 * ((angle + 36) % 360))) + 45) * 3.14159265 / 180); // Extend to screen edge
-    int light2Y2 = light2Y1 - 2000 * sin((abs(45 - (0.25 * ((angle + 36) % 360))) + 45) * 3.14159265 / 180); // Extend to screen edge
+    
+    // 计算探照灯角度和终点
+    float targetAngle1, targetAngle2;
+    int light1X2, light1Y2, light2X2, light2Y2;
+    
+    if (isTargetLocked && lockedTarget != NULL) {
+        // 计算从塔到锁定飞机的角度
+        float dx = lockedTarget->data.x - baseX;
+        float dy = lockedTarget->data.y - (baseY - towerHeight);
+        float targetAngleRad = atan2(-dy, dx);
+        targetAngle1 = targetAngleRad * 180.0f / 3.14159265f;
+        targetAngle2 = targetAngle1;
+        
+        // 平滑旋转探照灯1
+        if (currentSpotlightAngle1 != targetAngle1) {
+            float angleDiff = targetAngle1 - currentSpotlightAngle1;
+            // 处理角度跨越360度的情况
+            if (angleDiff > 180) angleDiff -= 360;
+            if (angleDiff < -180) angleDiff += 360;
+            
+            // 限制旋转速度
+            if (angleDiff > SPOTLIGHT_ROTATION_SPEED) {
+                currentSpotlightAngle1 += SPOTLIGHT_ROTATION_SPEED;
+            } else if (angleDiff < -SPOTLIGHT_ROTATION_SPEED) {
+                currentSpotlightAngle1 -= SPOTLIGHT_ROTATION_SPEED;
+            } else {
+                currentSpotlightAngle1 = targetAngle1;
+            }
+        }
+        
+        // 平滑旋转探照灯2
+        if (currentSpotlightAngle2 != targetAngle2) {
+            float angleDiff = targetAngle2 - currentSpotlightAngle2;
+            // 处理角度跨越360度的情况
+            if (angleDiff > 180) angleDiff -= 360;
+            if (angleDiff < -180) angleDiff += 360;
+            
+            // 限制旋转速度
+            if (angleDiff > SPOTLIGHT_ROTATION_SPEED) {
+                currentSpotlightAngle2 += SPOTLIGHT_ROTATION_SPEED;
+            } else if (angleDiff < -SPOTLIGHT_ROTATION_SPEED) {
+                currentSpotlightAngle2 -= SPOTLIGHT_ROTATION_SPEED;
+            } else {
+                currentSpotlightAngle2 = targetAngle2;
+            }
+        }
+    } else {
+        // 未锁定目标时，探照灯回到扫描状态
+        targetAngle1 = (abs(45 - (0.25 * ((angle) % 360))) + 90);
+        targetAngle2 = (abs(45 - (0.25 * ((angle + 36) % 360))) + 45);
+        
+        // 平滑旋转探照灯1
+        if (currentSpotlightAngle1 != targetAngle1) {
+            float angleDiff = targetAngle1 - currentSpotlightAngle1;
+            // 处理角度跨越360度的情况
+            if (angleDiff > 180) angleDiff -= 360;
+            if (angleDiff < -180) angleDiff += 360;
+            
+            // 限制旋转速度
+            if (angleDiff > SPOTLIGHT_ROTATION_SPEED) {
+                currentSpotlightAngle1 += SPOTLIGHT_ROTATION_SPEED;
+            } else if (angleDiff < -SPOTLIGHT_ROTATION_SPEED) {
+                currentSpotlightAngle1 -= SPOTLIGHT_ROTATION_SPEED;
+            } else {
+                currentSpotlightAngle1 = targetAngle1;
+            }
+        }
+        
+        // 平滑旋转探照灯2
+        if (currentSpotlightAngle2 != targetAngle2) {
+            float angleDiff = targetAngle2 - currentSpotlightAngle2;
+            // 处理角度跨越360度的情况
+            if (angleDiff > 180) angleDiff -= 360;
+            if (angleDiff < -180) angleDiff += 360;
+            
+            // 限制旋转速度
+            if (angleDiff > SPOTLIGHT_ROTATION_SPEED) {
+                currentSpotlightAngle2 += SPOTLIGHT_ROTATION_SPEED;
+            } else if (angleDiff < -SPOTLIGHT_ROTATION_SPEED) {
+                currentSpotlightAngle2 -= SPOTLIGHT_ROTATION_SPEED;
+            } else {
+                currentSpotlightAngle2 = targetAngle2;
+            }
+        }
+    }
+    
+    // 确保角度在0-360范围内
+    currentSpotlightAngle1 = fmod(currentSpotlightAngle1 + 360, 360);
+    currentSpotlightAngle2 = fmod(currentSpotlightAngle2 + 360, 360);
+    
+    // 计算探照灯终点
+    light1X2 = light1X1 + 2000 * cos(currentSpotlightAngle1 * 3.14159265 / 180);
+    light1Y2 = light1Y1 - 2000 * sin(currentSpotlightAngle1 * 3.14159265 / 180);
+    light2X2 = light2X1 + 2000 * cos(currentSpotlightAngle2 * 3.14159265 / 180);
+    light2Y2 = light2Y1 - 2000 * sin(currentSpotlightAngle2 * 3.14159265 / 180);
 
-    setlinecolor(RGB(255, 255, 0)); // Yellow light
+    // 根据是否锁定目标设置探照灯颜色
+    if (isTargetLocked && lockedTarget != NULL) {
+        setlinecolor(RGB(255, 0, 0)); // 锁定目标时为红色
+    } else {
+        setlinecolor(RGB(255, 255, 0)); // 正常扫描时为黄色
+    }
+    
+    // 绘制探照灯
     line(light1X1, light1Y1, light1X2, light1Y2);
     line(light2X1, light2Y1, light2X2, light2Y2);
     
@@ -961,6 +1099,53 @@ void gameLoop() {
                 isMouseLeftDown = true;
             } else if (m.uMsg == WM_LBUTTONUP) {
                 isMouseLeftDown = false;
+            } else if (m.uMsg == WM_RBUTTONDOWN) {
+                // 右键点击 - 寻找最近的飞机并锁定
+                struct AircraftNode* current = aircraftListHead;
+                struct AircraftNode* closestPlane = NULL;
+                float minDistance = FLT_MAX;
+                
+                // 遍历所有飞机，找出最近的一架
+                while (current != NULL) {
+                    // 只考虑未死亡的飞机
+                    if (!current->data.isDying) {
+                        float dx = current->data.x - mouseX;
+                        float dy = current->data.y - mouseY;
+                        float distance = sqrt(dx*dx + dy*dy);
+                        
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            closestPlane = current;
+                        }
+                    }
+                    current = current->next;
+                }
+                
+                // 如果找到了飞机，锁定它
+                if (closestPlane != NULL) {
+                    lockedTarget = closestPlane;
+                    isTargetLocked = true;
+                }
+            }
+        }
+        
+        // 检查锁定的飞机是否还存在或已被摧毁
+        if (isTargetLocked) {
+            bool targetFound = false;
+            struct AircraftNode* current = aircraftListHead;
+            
+            while (current != NULL) {
+                if (current == lockedTarget && !current->data.isDying) {
+                    targetFound = true;
+                    break;
+                }
+                current = current->next;
+            }
+            
+            // 如果目标不存在或已被摧毁，解除锁定
+            if (!targetFound) {
+                isTargetLocked = false;
+                lockedTarget = NULL;
             }
         }
 
