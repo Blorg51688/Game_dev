@@ -1316,6 +1316,27 @@ void gameLoop() {
             drawUpgradeScreen();
         }
 
+        // 检查是否有SUPER_HEAVY飞机满血飞越屏幕
+        struct AircraftNode* current = aircraftListHead;
+        while (current != NULL) {
+            if (current->data.type == SUPER_HEAVY && 
+                current->data.health == 100 && 
+                ((current->data.direction == 1 && current->data.x > screenWidth) || 
+                 (current->data.direction == -1 && current->data.x < 0))) {
+                // 显示失败信息
+                settextcolor(RGB(255, 0, 0));
+                settextstyle(48, 0, _T("Arial"));
+                outtextxy(screenWidth/2 - 300, screenHeight/2 - 50, _T("Mission Failed! Enemy has breached our defenses!"));
+                
+                settextcolor(RGB(255, 69, 0));
+                settextstyle(24, 0, _T("Arial"));
+                outtextxy(screenWidth/2 - 150, 50, _T("Press ESC to save and exit"));
+                break;
+            }
+            current = current->next;
+        }
+
+        // 胜利判定
         if (score >= 10000) {
             settextcolor(RGB(255, 215, 0));
             settextstyle(48, 0, _T("Arial"));
