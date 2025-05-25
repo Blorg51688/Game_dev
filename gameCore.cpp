@@ -37,7 +37,7 @@ bool showUpgradeScreen = false;  // 是否显示升级界面
 // 锁定飞机相关变量
 bool isTargetLocked = false;  // 是否锁定了目标飞机
 struct AircraftNode* lockedTarget = NULL;  // 被锁定的飞机指针
-float currentSpotlightAngle1 = 0.0f;  // 当前探照灯1的角度
+float currentSpotlightAngle1 = 180.0f;  // 当前探照灯1的角度
 float currentSpotlightAngle2 = 0.0f;  // 当前探照灯2的角度
 const float SPOTLIGHT_ROTATION_SPEED = 3.0f;  // 探照灯旋转速度(度/帧)
 
@@ -48,12 +48,12 @@ int score = 0;
 int difficultyModifier = 0;
 int skillPoints = 0;
 // 防空塔升级
-int AATowerUpgrade1 = 0;  // 每点使达到过热的时间+50%
+int AATowerUpgrade1 = 0;  // 每点使达到过热的时间+100%
 int AATowerUpgrade2 = 0;  // 每点使防空塔射击间隔-20%
 // 防空阵地升级
-int AABatteriesUpgrade1 = 0;  // 每点使防空阵地连射最小值+1，随机修正部分+2
+int AABatteriesUpgrade1 = 0;  // 每点使防空阵地连射最小值+50%，随机修正部分+100%
 // 炮弹升级
-int shellUpgrade1 = 0;  // 每点使炮弹伤害+50%
+int shellUpgrade1 = 0;  // 每点使炮弹伤害+25%
 int shellUpgrade2 = 0;  // 每点使所有炮弹飞行速度+50%
 
 // 在全局游戏数据部分添加以下内容
@@ -133,7 +133,7 @@ void handleCollision(Aircraft& plane) {
     
     // 根据shellUpgrade1计算炮弹伤害
     int baseDamage = 10;
-    int actualDamage = baseDamage * (100 + shellUpgrade1 * 50) / 100; // 每点shellUpgrade1增加50%伤害
+    int actualDamage = baseDamage * (100 + shellUpgrade1 * 25) / 100; // 每点shellUpgrade1增加25%伤害
     plane.health -= actualDamage;
 
     // 如果飞机血量降至0，初始化爆炸动画并增加分数
@@ -144,16 +144,16 @@ void handleCollision(Aircraft& plane) {
         // 根据飞机类型增加相应分数
         switch(plane.type) {
             case LIGHT:
-                score += 40;
+                score += 200;
                 break;
             case MEDIUM:
-                score += 60;
+                score += 120;
                 break;
             case HEAVY:
-                score += 100;
+                score += 80;
                 break;
             case SUPER_HEAVY:
-                score += 150;
+                score += 100;
                 break;
         }
         
@@ -355,6 +355,7 @@ void updateAircrafts() {
             // 检查飞机是否触底，如果触底则立刻将血量清零
             if (current->data.y >= screenHeight - 50 && !current->data.isDying) {
                 current->data.health = 0;
+                score -= 20;
                 handleCollision(current->data);
             }
         }
@@ -603,7 +604,7 @@ void addAABatteriesProjectiles(int screenWidth, int screenHeight) {
         // Create projectiles for battery 1
         // 根据AABatteriesUpgrade1增加连射最小值和随机修正
         int minShots = 2 + AABatteriesUpgrade1; // 最小值+1每点
-        int randomModifier = 8 + AABatteriesUpgrade1 * 2; // 随机修正+2每点
+        int randomModifier = 3 + AABatteriesUpgrade1 * 3; // 随机修正+2每点
         for (int i = 0; i < (rand() % randomModifier) + minShots; ++i) {
             Projectile p1;
             p1.x = battery1X + (rand() % 20 - 10);
@@ -662,8 +663,8 @@ void addAATowerProjectiles(int screenWidth, int screenHeight) {
     int towerY = screenHeight - 30 - 80; // 塔顶位置 (baseY - towerHeight)
     
     // 检查鼠标是否按下且防空塔未处于过热状态
-    // 根据AATowerUpgrade1调整过热阈值，每点使达到过热的时间+50%
-    float overHeatThreshold = MAX_HEAT_LEVEL * (0.9f + AATowerUpgrade1 * 0.5f);
+    // 根据AATowerUpgrade1调整过热阈值，每点使达到过热的时间+100%
+    float overHeatThreshold = MAX_HEAT_LEVEL * (0.9f + AATowerUpgrade1 * 1.0f);
     // 确保阈值不超过最大热量的3倍
     overHeatThreshold = min(overHeatThreshold, MAX_HEAT_LEVEL * 3.0f);
     
@@ -913,7 +914,7 @@ void drawAATower(int screenWidth, int screenHeight, int angle) {
     rectangle(heatBarX, heatBarY, heatBarX + heatBarWidth, heatBarY - heatBarHeight);
     
     // 计算过热阈值（与addAATowerProjectiles函数中相同的计算方式）
-    float overHeatThreshold = MAX_HEAT_LEVEL * (0.9f + AATowerUpgrade1 * 0.5f);
+    float overHeatThreshold = MAX_HEAT_LEVEL * (0.9f + AATowerUpgrade1 * 1.0f);
     overHeatThreshold = min(overHeatThreshold, MAX_HEAT_LEVEL * 3.0f);
     
     // 计算当前过热度对应的高度（使用百分比而非绝对值）
@@ -1007,35 +1008,73 @@ void drawUpgradeScreen() {
     
     // 绘制升级选项
     int startY = 150;
-    int lineHeight = 40;
+    
+    // 升级选项1: AATowerUpgrade1
+    // 设置更大的字体和行间距
+    settextstyle(36, 0, _T("Arial"));
+    int lineHeight = 100;
+    int levelBoxWidth = 60;
+    int levelBoxHeight = 40;
+    int textStartX = 200;
     
     // 升级选项1: AATowerUpgrade1
     TCHAR upgrade1[128];
-    _stprintf(upgrade1, _T("AATowerUpgrade1 (Q): Increase overheat time by 50%% per level. Current level: %d"), AATowerUpgrade1);
-    outtextxy(100, startY, upgrade1);
+    _stprintf(upgrade1, _T("AATowerUpgrade1 (Q): Increase shots takes to overheat by 100%% per level"));
+    
+    // 绘制等级框
+    setlinecolor(AATowerUpgrade1 >= 4 ? RGB(255, 0, 0) : RGB(0, 145, 255)); // 满级时边框变红
+    roundrect(100, startY - levelBoxHeight/2, 100 + levelBoxWidth, startY + levelBoxHeight/2, 10, 10);
+    TCHAR level1[8];
+    _stprintf(level1, _T("%d"), AATowerUpgrade1);
+    outtextxy(120, startY - 18, level1);
+    outtextxy(textStartX, startY - 18, upgrade1);
     
     // 升级选项2: AATowerUpgrade2
     TCHAR upgrade2[128];
-    _stprintf(upgrade2, _T("AATowerUpgrade2 (W): Decrease firing interval by 20%% per level. Current level: %d"), AATowerUpgrade2);
-    outtextxy(100, startY + lineHeight, upgrade2);
+    _stprintf(upgrade2, _T("AATowerUpgrade2 (W): Decrease firing interval by 20%% per level"));
+    
+    setlinecolor(AATowerUpgrade2 >= 4 ? RGB(255, 0, 0) : RGB(0, 145, 255)); // 满级时边框变红
+    roundrect(100, startY + lineHeight - levelBoxHeight/2, 100 + levelBoxWidth, startY + lineHeight + levelBoxHeight/2, 10, 10);
+    TCHAR level2[8];
+    _stprintf(level2, _T("%d"), AATowerUpgrade2);
+    outtextxy(120, startY + lineHeight - 18, level2);
+    outtextxy(textStartX, startY + lineHeight - 18, upgrade2);
     
     // 升级选项3: AABatteriesUpgrade1
     TCHAR upgrade3[128];
-    _stprintf(upgrade3, _T("AABatteriesUpgrade1 (E): Increase AA batteries min shots by 1 and random by 2. Current level: %d"), AABatteriesUpgrade1);
-    outtextxy(100, startY + lineHeight * 2, upgrade3);
+    _stprintf(upgrade3, _T("AABatteriesUpgrade1 (E): Increase min shots by 50%% and random by 100%%"));
+    
+    setlinecolor(AABatteriesUpgrade1 >= 4 ? RGB(255, 0, 0) : RGB(0, 145, 255)); // 满级时边框变红
+    roundrect(100, startY + lineHeight * 2 - levelBoxHeight/2, 100 + levelBoxWidth, startY + lineHeight * 2 + levelBoxHeight/2, 10, 10);
+    TCHAR level3[8];
+    _stprintf(level3, _T("%d"), AABatteriesUpgrade1);
+    outtextxy(120, startY + lineHeight * 2 - 18, level3);
+    outtextxy(textStartX, startY + lineHeight * 2 - 18, upgrade3);
     
     // 升级选项4: shellUpgrade1
     TCHAR upgrade4[128];
-    _stprintf(upgrade4, _T("shellUpgrade1 (R): Increase shell damage by 50%% per level. Current level: %d"), shellUpgrade1);
-    outtextxy(100, startY + lineHeight * 3, upgrade4);
+    _stprintf(upgrade4, _T("shellUpgrade1 (R): Increase shell damage by 25%% per level"));
+    
+    setlinecolor(shellUpgrade1 >= 4 ? RGB(255, 0, 0) : RGB(0, 145, 255)); // 满级时边框变红
+    roundrect(100, startY + lineHeight * 3 - levelBoxHeight/2, 100 + levelBoxWidth, startY + lineHeight * 3 + levelBoxHeight/2, 10, 10);
+    TCHAR level4[8];
+    _stprintf(level4, _T("%d"), shellUpgrade1);
+    outtextxy(120, startY + lineHeight * 3 - 18, level4);
+    outtextxy(textStartX, startY + lineHeight * 3 - 18, upgrade4);
     
     // 升级选项5: shellUpgrade2
     TCHAR upgrade5[128];
-    _stprintf(upgrade5, _T("shellUpgrade2 (T): Increase all shell speed by 50%% per level. Current level: %d"), shellUpgrade2);
-    outtextxy(100, startY + lineHeight * 4, upgrade5);
+    _stprintf(upgrade5, _T("shellUpgrade2 (T): Increase all shell speed by 50%% per level"));
+    
+    setlinecolor(shellUpgrade2 >= 4 ? RGB(255, 0, 0) : RGB(0, 145, 255)); // 满级时边框变红
+    roundrect(100, startY + lineHeight * 4 - levelBoxHeight/2, 100 + levelBoxWidth, startY + lineHeight * 4 + levelBoxHeight/2, 10, 10);
+    TCHAR level5[8];
+    _stprintf(level5, _T("%d"), shellUpgrade2);
+    outtextxy(120, startY + lineHeight * 4 - 18, level5);
+    outtextxy(textStartX, startY + lineHeight * 4 - 18, upgrade5);
     
     // 返回游戏提示
-    settextstyle(24, 0, _T("Arial"));
+    settextstyle(32, 0, _T("Arial"));
     TCHAR returnText[64] = _T("Press U to return to game");
     int returnWidth = textwidth(returnText);
     outtextxy((screenWidth - returnWidth) / 2, startY + lineHeight * 6, returnText);
@@ -1150,35 +1189,35 @@ void gameLoop() {
                 // 只有在升级界面中Q~T键才能用于升级
                 case 'q':
                 case 'Q':
-                    if(showUpgradeScreen && skillPoints > 0) {
+                    if(showUpgradeScreen && skillPoints > 0 && AATowerUpgrade1 < 4) {
                         AATowerUpgrade1++;
                         skillPoints--;
                     }
                     break;
                 case 'w':
                 case 'W':
-                    if(showUpgradeScreen && skillPoints > 0) {
+                    if(showUpgradeScreen && skillPoints > 0 && AATowerUpgrade2 < 4) {
                         AATowerUpgrade2++;
                         skillPoints--;
                     }
                     break;
                 case 'e':
                 case 'E':
-                    if(showUpgradeScreen && skillPoints > 0) {
+                    if(showUpgradeScreen && skillPoints > 0 && AABatteriesUpgrade1 < 4) {
                         AABatteriesUpgrade1++;
                         skillPoints--;
                     }
                     break;
                 case 'r':
                 case 'R':
-                    if(showUpgradeScreen && skillPoints > 0) {
+                    if(showUpgradeScreen && skillPoints > 0 && shellUpgrade1 < 4) {
                         shellUpgrade1++;
                         skillPoints--;
                     }
                     break;
                 case 't':
                 case 'T':
-                    if(showUpgradeScreen && skillPoints > 0) {
+                    if(showUpgradeScreen && skillPoints > 0 && shellUpgrade2 < 4) {
                         shellUpgrade2++;
                         skillPoints--;
                     }
